@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 
 const SubirFoto = () => {
   const navigate = useNavigate();
-  const { selectedImageUrl, setSelectedImageUrl, setSelectedImageBase64, setAnalysisResult } = useImage();
+  const { selectedImageUrl, setSelectedImageUrl, selectedImageBase64, setSelectedImageBase64, setAnalysisResult } = useImage();
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -71,7 +71,7 @@ const SubirFoto = () => {
     
     try {
       const { data, error } = await supabase.functions.invoke('analyze-dental', {
-        body: { imageBase64: selectedImageUrl }
+        body: { imageBase64: selectedImageBase64 }
       });
 
       if (error) {
