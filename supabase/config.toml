@@ -1,0 +1,4 @@
+project_id = "tqidweeyjqimxljutgut"
+
+[functions.analyze-dental]
+verify_jwt = false

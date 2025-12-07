@@ -1,62 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { useImage } from '@/context/ImageContext';
-import { Scan, ArrowLeft, AlertCircle, Info } from 'lucide-react';
+import { useImage, Hallazgo } from '@/context/ImageContext';
+import { Scan, ArrowLeft, AlertCircle, Info, CheckCircle2, AlertTriangle, ImageOff } from 'lucide-react';
 
-interface Deteccion {
-  label: string;
-  descripcion: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-  colorClass: string;
-}
+const tipoConfig: Record<string, { color: string; colorClass: string; label: string }> = {
+  caries: { color: '#ef4444', colorClass: 'bg-destructive', label: 'Posible caries' },
+  calculo: { color: '#22c55e', colorClass: 'bg-success', label: 'Posible cálculo/sarro' },
+  desgaste: { color: '#f59e0b', colorClass: 'bg-warning', label: 'Desgaste dental' },
+  gingivitis: { color: '#8b5cf6', colorClass: 'bg-purple-500', label: 'Posible gingivitis' },
+  otro: { color: '#6b7280', colorClass: 'bg-gray-500', label: 'Observación' },
+};
 
-const deteccionesSimuladas: Deteccion[] = [
-  { 
-    label: "Posible caries", 
-    descripcion: "Zona posterior izquierda con posible lesión cariosa",
-    x: 0.15, 
-    y: 0.20, 
-    width: 0.15, 
-    height: 0.12, 
-    color: "#ef4444",
-    colorClass: "bg-destructive"
-  },
-  { 
-    label: "Posible cálculo", 
-    descripcion: "Acumulación de sarro en zona de encía anterior",
-    x: 0.40, 
-    y: 0.55, 
-    width: 0.20, 
-    height: 0.10, 
-    color: "#22c55e",
-    colorClass: "bg-success"
-  },
-  { 
-    label: "Desgaste dental", 
-    descripcion: "Desgaste visible en borde incisivo",
-    x: 0.65, 
-    y: 0.30, 
-    width: 0.20, 
-    height: 0.15, 
-    color: "#f59e0b",
-    colorClass: "bg-warning"
-  }
-];
+const confianzaLabel: Record<string, string> = {
+  alta: 'Alta confianza',
+  media: 'Confianza media',
+  baja: 'Baja confianza',
+};
 
 const Analisis = () => {
   const navigate = useNavigate();
-  const { selectedImageUrl } = useImage();
+  const { selectedImageUrl, analysisResult } = useImage();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    if (!selectedImageUrl) {
+    if (!selectedImageUrl || !analysisResult) {
       navigate('/subir-foto');
       return;
     }
@@ -72,7 +42,6 @@ const Analisis = () => {
     img.crossOrigin = 'anonymous';
     
     img.onload = () => {
-      // Calculate dimensions to fit container while maintaining aspect ratio
       const containerWidth = container.clientWidth;
       const maxHeight = 400;
       
@@ -91,40 +60,49 @@ const Analisis = () => {
       // Draw image
       ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
 
-      // Draw detection rectangles
-      deteccionesSimuladas.forEach(det => {
-        const rectX = det.x * canvasWidth;
-        const rectY = det.y * canvasHeight;
-        const rectWidth = det.width * canvasWidth;
-        const rectHeight = det.height * canvasHeight;
+      // Draw detection rectangles from AI analysis
+      if (analysisResult.hallazgos && analysisResult.hallazgos.length > 0) {
+        analysisResult.hallazgos.forEach((hallazgo: Hallazgo) => {
+          const config = tipoConfig[hallazgo.tipo] || tipoConfig.otro;
+          const coords = hallazgo.coordenadas;
+          
+          if (coords) {
+            const rectX = coords.x * canvasWidth;
+            const rectY = coords.y * canvasHeight;
+            const rectWidth = coords.width * canvasWidth;
+            const rectHeight = coords.height * canvasHeight;
 
-        // Draw semi-transparent fill
-        ctx.fillStyle = det.color + '20';
-        ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
+            // Draw semi-transparent fill
+            ctx.fillStyle = config.color + '25';
+            ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
 
-        // Draw border
-        ctx.strokeStyle = det.color;
-        ctx.lineWidth = 3;
-        ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+            // Draw border
+            ctx.strokeStyle = config.color;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
 
-        // Draw label background
-        ctx.font = 'bold 11px Plus Jakarta Sans, sans-serif';
-        const textWidth = ctx.measureText(det.label).width;
-        ctx.fillStyle = det.color;
-        ctx.fillRect(rectX, rectY - 20, textWidth + 10, 18);
+            // Draw label background
+            ctx.font = 'bold 11px Plus Jakarta Sans, sans-serif';
+            const textWidth = ctx.measureText(config.label).width;
+            ctx.fillStyle = config.color;
+            ctx.fillRect(rectX, rectY - 20, textWidth + 10, 18);
 
-        // Draw label text
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(det.label, rectX + 5, rectY - 6);
-      });
+            // Draw label text
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(config.label, rectX + 5, rectY - 6);
+          }
+        });
+      }
 
       setIsLoaded(true);
     };
 
     img.src = selectedImageUrl;
-  }, [selectedImageUrl, navigate]);
+  }, [selectedImageUrl, analysisResult, navigate]);
 
-  if (!selectedImageUrl) return null;
+  if (!selectedImageUrl || !analysisResult) return null;
+
+  const hasFindings = analysisResult.hallazgos && analysisResult.hallazgos.length > 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -140,7 +118,7 @@ const Analisis = () => {
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
             <Scan className="w-5 h-5 text-primary-foreground" />
           </div>
-          <span className="font-semibold text-lg text-foreground">Zonas marcadas</span>
+          <span className="font-semibold text-lg text-foreground">Resultados del análisis</span>
         </div>
       </header>
 
@@ -150,12 +128,37 @@ const Analisis = () => {
           {/* Title */}
           <div className="text-center space-y-2">
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-              Zonas marcadas en tu foto
+              {analysisResult.analisisValido 
+                ? 'Análisis completado' 
+                : 'No se pudo analizar la imagen'}
             </h1>
             <p className="text-muted-foreground">
-              Hemos identificado las siguientes áreas de interés
+              {analysisResult.mensajeGeneral}
             </p>
           </div>
+
+          {/* Image quality warning */}
+          {analysisResult.calidadImagen !== 'buena' && (
+            <div className={`rounded-xl p-4 flex items-start gap-3 ${
+              analysisResult.calidadImagen === 'mala' 
+                ? 'bg-destructive/10 border border-destructive/20' 
+                : 'bg-warning/10 border border-warning/20'
+            }`}>
+              <ImageOff className={`w-5 h-5 shrink-0 mt-0.5 ${
+                analysisResult.calidadImagen === 'mala' ? 'text-destructive' : 'text-warning'
+              }`} />
+              <div>
+                <h3 className={`font-semibold text-sm ${
+                  analysisResult.calidadImagen === 'mala' ? 'text-destructive' : 'text-warning'
+                }`}>
+                  Calidad de imagen: {analysisResult.calidadImagen}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {analysisResult.notaCalidadImagen}
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="grid md:grid-cols-2 gap-6">
             {/* Canvas */}
@@ -179,43 +182,101 @@ const Analisis = () => {
             {/* Detections list */}
             <div className="space-y-4">
               <h2 className="font-semibold text-foreground flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-primary" />
-                Hallazgos detectados
+                {hasFindings ? (
+                  <>
+                    <AlertCircle className="w-5 h-5 text-primary" />
+                    Hallazgos detectados ({analysisResult.hallazgos.length})
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-5 h-5 text-success" />
+                    Sin hallazgos evidentes
+                  </>
+                )}
               </h2>
               
-              <div className="space-y-3">
-                {deteccionesSimuladas.map((det, index) => (
-                  <div 
-                    key={index}
-                    className="bg-card rounded-xl p-4 border border-border flex items-start gap-3"
-                  >
-                    <div className={`w-4 h-4 rounded-full ${det.colorClass} shrink-0 mt-0.5`} />
-                    <div>
-                      <h3 className="font-semibold text-foreground">{det.label}</h3>
-                      <p className="text-sm text-muted-foreground">{det.descripcion}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {hasFindings ? (
+                <div className="space-y-3">
+                  {analysisResult.hallazgos.map((hallazgo: Hallazgo, index: number) => {
+                    const config = tipoConfig[hallazgo.tipo] || tipoConfig.otro;
+                    return (
+                      <div 
+                        key={index}
+                        className="bg-card rounded-xl p-4 border border-border"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-4 h-4 rounded-full ${config.colorClass} shrink-0 mt-0.5`} />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="font-semibold text-foreground">{config.label}</h3>
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                hallazgo.confianza === 'alta' 
+                                  ? 'bg-success/20 text-success' 
+                                  : hallazgo.confianza === 'media'
+                                    ? 'bg-warning/20 text-warning'
+                                    : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {confianzaLabel[hallazgo.confianza]}
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{hallazgo.descripcion}</p>
+                            {hallazgo.ubicacion && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                📍 {hallazgo.ubicacion}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="bg-success/10 rounded-xl p-4 border border-success/20">
+                  <p className="text-sm text-foreground">
+                    No se detectaron problemas evidentes en la imagen. Sin embargo, esto <strong>no garantiza</strong> que no existan problemas dentales. 
+                    Una evaluación profesional presencial es necesaria para un diagnóstico completo.
+                  </p>
+                </div>
+              )}
 
-              {/* Info note */}
+              {/* Recommendation */}
+              {analysisResult.recomendacion && (
+                <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+                  <h3 className="font-semibold text-sm text-primary mb-2">💡 Recomendación</h3>
+                  <p className="text-sm text-foreground">{analysisResult.recomendacion}</p>
+                </div>
+              )}
+
+              {/* Disclaimer */}
               <div className="bg-accent/50 rounded-xl p-4 flex items-start gap-3">
-                <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
                 <p className="text-sm text-accent-foreground">
-                  Estos hallazgos son simulados con fines demostrativos. Un análisis real requiere evaluación profesional.
+                  <strong>Importante:</strong> Este análisis es orientativo y fue realizado por inteligencia artificial. 
+                  NO reemplaza la evaluación de un profesional odontólogo. 
+                  Consulta con tu dentista para un diagnóstico definitivo.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Action button */}
-          <div className="flex justify-center pt-4">
+          {/* Action buttons */}
+          <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
+            {hasFindings && (
+              <Button 
+                variant="hero" 
+                size="lg"
+                onClick={() => navigate('/explicacion')}
+              >
+                Ver explicación detallada
+              </Button>
+            )}
             <Button 
-              variant="hero" 
+              variant="outline" 
               size="lg"
-              onClick={() => navigate('/explicacion')}
+              onClick={() => navigate('/subir-foto')}
             >
-              Ver explicación para el paciente
+              Analizar otra foto
             </Button>
           </div>
         </div>

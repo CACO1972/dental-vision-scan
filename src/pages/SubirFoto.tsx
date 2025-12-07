@@ -2,19 +2,39 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useImage } from '@/context/ImageContext';
-import { Scan, Upload, Camera, CheckCircle, ArrowLeft, X } from 'lucide-react';
+import { Scan, Upload, Camera, CheckCircle, ArrowLeft, X, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const SubirFoto = () => {
   const navigate = useNavigate();
-  const { selectedImageUrl, setSelectedImageUrl } = useImage();
+  const { selectedImageUrl, setSelectedImageUrl, setSelectedImageBase64, setAnalysisResult } = useImage();
   const [isDragging, setIsDragging] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const handleFileSelect = useCallback((file: File) => {
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const handleFileSelect = useCallback(async (file: File) => {
     if (file && file.type.startsWith('image/')) {
       const url = URL.createObjectURL(file);
       setSelectedImageUrl(url);
+      
+      try {
+        const base64 = await convertToBase64(file);
+        setSelectedImageBase64(base64);
+      } catch (error) {
+        console.error('Error converting to base64:', error);
+        toast.error('Error al procesar la imagen');
+      }
     }
-  }, [setSelectedImageUrl]);
+  }, [setSelectedImageUrl, setSelectedImageBase64]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -42,6 +62,37 @@ const SubirFoto = () => {
       URL.revokeObjectURL(selectedImageUrl);
     }
     setSelectedImageUrl(null);
+    setSelectedImageBase64(null);
+    setAnalysisResult(null);
+  };
+
+  const handleAnalyze = async () => {
+    setIsAnalyzing(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-dental', {
+        body: { imageBase64: selectedImageUrl }
+      });
+
+      if (error) {
+        console.error('Analysis error:', error);
+        toast.error('Error al analizar la imagen. Intenta de nuevo.');
+        return;
+      }
+
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      setAnalysisResult(data);
+      navigate('/analisis');
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error de conexión. Verifica tu internet e intenta de nuevo.');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -130,7 +181,8 @@ const SubirFoto = () => {
             <div className="relative bg-card rounded-2xl border border-border overflow-hidden">
               <button
                 onClick={clearImage}
-                className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-foreground/80 hover:bg-foreground flex items-center justify-center transition-colors"
+                disabled={isAnalyzing}
+                className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-foreground/80 hover:bg-foreground flex items-center justify-center transition-colors disabled:opacity-50"
               >
                 <X className="w-4 h-4 text-background" />
               </button>
@@ -153,15 +205,28 @@ const SubirFoto = () => {
             variant="hero" 
             size="xl" 
             className="w-full"
-            disabled={!selectedImageUrl}
-            onClick={() => navigate('/analisis')}
+            disabled={!selectedImageUrl || isAnalyzing}
+            onClick={handleAnalyze}
           >
-            Ver análisis simulado
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Analizando con IA...
+              </>
+            ) : (
+              'Analizar con inteligencia artificial'
+            )}
           </Button>
 
-          {selectedImageUrl && (
+          {selectedImageUrl && !isAnalyzing && (
             <p className="text-center text-sm text-muted-foreground">
               ¿Imagen incorrecta? Haz clic en la X para cambiarla
+            </p>
+          )}
+
+          {isAnalyzing && (
+            <p className="text-center text-sm text-muted-foreground animate-pulse">
+              Esto puede tomar unos segundos...
             </p>
           )}
         </div>
