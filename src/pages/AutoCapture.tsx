@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useImage } from '@/context/ImageContext';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,34 @@ const viewInstructions: Record<ViewType, string> = {
   inferior: 'Mira hacia el piso, abre bien la boca y baja la lengua. Coloca los dientes inferiores dentro del recuadro.',
 };
 
+const STABILITY_THRESHOLD = 15;
+const STABILITY_TIME_MS = 1500;
+const BRIGHTNESS_MIN = 60;
+const SAMPLE_SIZE = 50;
+
+// Play shutter sound using Web Audio API
+const playShutterSound = () => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.1);
+  } catch (e) {
+    console.log('Could not play shutter sound');
+  }
+};
+
 const AutoCapture = () => {
   const navigate = useNavigate();
   const { setSelectedImageUrl, setSelectedImageBase64 } = useImage();
@@ -23,6 +51,7 @@ const AutoCapture = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number | null>(null);
   const stableStartRef = useRef<number | null>(null);
+  const hasCapturedRef = useRef(false);
 
   const [selectedView, setSelectedView] = useState<ViewType>('frontal');
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -30,13 +59,9 @@ const AutoCapture = () => {
   const [isLightAdequate, setIsLightAdequate] = useState(false);
   const [statusText, setStatusText] = useState('Iniciando cámara...');
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
 
-  const STABILITY_THRESHOLD = 15;
-  const STABILITY_TIME_MS = 1500;
-  const BRIGHTNESS_MIN = 60;
-  const SAMPLE_SIZE = 50;
-
-  const stopCamera = useCallback(() => {
+  const stopCamera = () => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
@@ -45,150 +70,7 @@ const AutoCapture = () => {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-  }, []);
-
-  const takePicture = useCallback(() => {
-    if (!canvasRef.current || !videoRef.current || isCapturing) return;
-    
-    setIsCapturing(true);
-    setStatusText('Listo, capturando...');
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Draw final frame
-    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-    
-    // Get image data
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    const base64 = dataUrl.split(',')[1];
-    
-    // Store in context
-    setSelectedImageUrl(dataUrl);
-    setSelectedImageBase64(base64);
-    
-    // Stop camera and navigate
-    stopCamera();
-    
-    setTimeout(() => {
-      navigate('/analisis');
-    }, 500);
-  }, [isCapturing, navigate, setSelectedImageUrl, setSelectedImageBase64, stopCamera]);
-
-  const analyzeFrame = useCallback(() => {
-    if (!canvasRef.current || !videoRef.current || isCapturing) return;
-
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx || video.readyState < 2) {
-      animationRef.current = requestAnimationFrame(analyzeFrame);
-      return;
-    }
-
-    // Draw current frame
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    // Sample pixels for analysis
-    const currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    
-    // Calculate brightness
-    let totalBrightness = 0;
-    const step = Math.floor(currentFrame.data.length / 4 / SAMPLE_SIZE);
-    for (let i = 0; i < currentFrame.data.length; i += step * 4) {
-      const r = currentFrame.data[i];
-      const g = currentFrame.data[i + 1];
-      const b = currentFrame.data[i + 2];
-      totalBrightness += (r + g + b) / 3;
-    }
-    const avgBrightness = totalBrightness / SAMPLE_SIZE;
-    const lightOk = avgBrightness >= BRIGHTNESS_MIN;
-    setIsLightAdequate(lightOk);
-
-    // Calculate stability (frame difference)
-    let stability = 100;
-    if (prevFrameRef.current) {
-      let totalDiff = 0;
-      const prevData = prevFrameRef.current.data;
-      for (let i = 0; i < currentFrame.data.length; i += step * 4) {
-        const rDiff = Math.abs(currentFrame.data[i] - prevData[i]);
-        const gDiff = Math.abs(currentFrame.data[i + 1] - prevData[i + 1]);
-        const bDiff = Math.abs(currentFrame.data[i + 2] - prevData[i + 2]);
-        totalDiff += (rDiff + gDiff + bDiff) / 3;
-      }
-      const avgDiff = totalDiff / SAMPLE_SIZE;
-      
-      if (avgDiff < STABILITY_THRESHOLD) {
-        if (!stableStartRef.current) {
-          stableStartRef.current = Date.now();
-        }
-        const elapsed = Date.now() - stableStartRef.current;
-        stability = Math.min(100, (elapsed / STABILITY_TIME_MS) * 100);
-        
-        if (stability < 50) {
-          setStatusText('Mantén la posición...');
-        } else if (stability < 100) {
-          setStatusText('Casi listo...');
-        }
-      } else {
-        stableStartRef.current = null;
-        stability = Math.max(0, stability - 10);
-        setStatusText('Moviendo...');
-      }
-    }
-    
-    setStabilityProgress(stability);
-    prevFrameRef.current = currentFrame;
-
-    // Check capture conditions
-    if (stability >= 100 && lightOk && !isCapturing) {
-      takePicture();
-      return;
-    }
-
-    animationRef.current = requestAnimationFrame(analyzeFrame);
-  }, [isCapturing, takePicture]);
-
-  const startCamera = useCallback(async () => {
-    try {
-      setCameraError(null);
-      setStatusText('Iniciando cámara...');
-      
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      });
-      
-      streamRef.current = stream;
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-          
-          if (canvasRef.current && videoRef.current) {
-            canvasRef.current.width = videoRef.current.videoWidth;
-            canvasRef.current.height = videoRef.current.videoHeight;
-          }
-          
-          setStatusText('Coloca los dientes en el recuadro');
-          animationRef.current = requestAnimationFrame(analyzeFrame);
-        };
-      }
-    } catch (error) {
-      console.error('Camera error:', error);
-      setCameraError('No se pudo acceder a la cámara. Revisa los permisos de tu navegador o carga una foto desde la galería.');
-    }
-  }, [analyzeFrame]);
-
-  useEffect(() => {
-    startCamera();
-    return () => stopCamera();
-  }, [startCamera, stopCamera]);
+  };
 
   const handleCancel = () => {
     stopCamera();
@@ -205,6 +87,168 @@ const AutoCapture = () => {
         return 'top-[30%]';
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+
+    const startCamera = async () => {
+      try {
+        setCameraError(null);
+        setStatusText('Iniciando cámara...');
+        
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        });
+        
+        if (!mounted) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+        
+        streamRef.current = stream;
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            if (!mounted) return;
+            videoRef.current?.play();
+            
+            if (canvasRef.current && videoRef.current) {
+              canvasRef.current.width = videoRef.current.videoWidth;
+              canvasRef.current.height = videoRef.current.videoHeight;
+            }
+            
+            setStatusText('Coloca los dientes en el recuadro');
+            setIsCameraReady(true);
+          };
+        }
+      } catch (error) {
+        console.error('Camera error:', error);
+        if (mounted) {
+          setCameraError('No se pudo acceder a la cámara. Revisa los permisos de tu navegador o carga una foto desde la galería.');
+        }
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      mounted = false;
+      stopCamera();
+    };
+  }, []);
+
+  // Analysis loop
+  useEffect(() => {
+    if (!isCameraReady || isCapturing) return;
+
+    const analyzeFrame = () => {
+      if (!canvasRef.current || !videoRef.current || hasCapturedRef.current) return;
+
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx || video.readyState < 2) {
+        animationRef.current = requestAnimationFrame(analyzeFrame);
+        return;
+      }
+
+      // Draw current frame
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Sample pixels for analysis
+      const currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      // Calculate brightness
+      let totalBrightness = 0;
+      const step = Math.floor(currentFrame.data.length / 4 / SAMPLE_SIZE);
+      for (let i = 0; i < currentFrame.data.length; i += step * 4) {
+        const r = currentFrame.data[i];
+        const g = currentFrame.data[i + 1];
+        const b = currentFrame.data[i + 2];
+        totalBrightness += (r + g + b) / 3;
+      }
+      const avgBrightness = totalBrightness / SAMPLE_SIZE;
+      const lightOk = avgBrightness >= BRIGHTNESS_MIN;
+      setIsLightAdequate(lightOk);
+
+      // Calculate stability (frame difference)
+      let stability = 0;
+      if (prevFrameRef.current) {
+        let totalDiff = 0;
+        const prevData = prevFrameRef.current.data;
+        for (let i = 0; i < currentFrame.data.length; i += step * 4) {
+          const rDiff = Math.abs(currentFrame.data[i] - prevData[i]);
+          const gDiff = Math.abs(currentFrame.data[i + 1] - prevData[i + 1]);
+          const bDiff = Math.abs(currentFrame.data[i + 2] - prevData[i + 2]);
+          totalDiff += (rDiff + gDiff + bDiff) / 3;
+        }
+        const avgDiff = totalDiff / SAMPLE_SIZE;
+        
+        if (avgDiff < STABILITY_THRESHOLD) {
+          if (!stableStartRef.current) {
+            stableStartRef.current = Date.now();
+          }
+          const elapsed = Date.now() - stableStartRef.current;
+          stability = Math.min(100, (elapsed / STABILITY_TIME_MS) * 100);
+          
+          if (stability < 50) {
+            setStatusText('Mantén la posición...');
+          } else if (stability < 100) {
+            setStatusText('Casi listo...');
+          }
+        } else {
+          stableStartRef.current = null;
+          stability = 0;
+          setStatusText('Moviendo...');
+        }
+      }
+      
+      setStabilityProgress(stability);
+      prevFrameRef.current = currentFrame;
+
+      // Check capture conditions
+      if (stability >= 100 && lightOk && !hasCapturedRef.current) {
+        hasCapturedRef.current = true;
+        setIsCapturing(true);
+        setStatusText('Listo, capturando...');
+        
+        // Play shutter sound
+        playShutterSound();
+
+        // Get image data
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        const base64 = dataUrl.split(',')[1];
+        
+        // Store in context
+        setSelectedImageUrl(dataUrl);
+        setSelectedImageBase64(base64);
+        
+        // Stop camera and navigate
+        stopCamera();
+        
+        setTimeout(() => {
+          navigate('/analisis');
+        }, 500);
+        return;
+      }
+
+      animationRef.current = requestAnimationFrame(analyzeFrame);
+    };
+
+    animationRef.current = requestAnimationFrame(analyzeFrame);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isCameraReady, isCapturing, navigate, setSelectedImageUrl, setSelectedImageBase64]);
 
   if (cameraError) {
     return (
