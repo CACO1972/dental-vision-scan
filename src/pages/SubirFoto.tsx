@@ -140,41 +140,58 @@ const SubirFoto = () => {
             </ul>
           </div>
 
-          {/* Upload area */}
+          {/* Upload options */}
           {!selectedImageUrl ? (
-            <div
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              className={`
-                relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 cursor-pointer
-                ${isDragging 
-                  ? 'border-primary bg-accent/50' 
-                  : 'border-border hover:border-primary/50 hover:bg-secondary/50'
-                }
-              `}
-            >
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleInputChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              <div className="space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-accent mx-auto flex items-center justify-center">
-                  <Upload className="w-8 h-8 text-primary" />
+            <div className="space-y-4">
+              {/* Auto capture button */}
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full py-6 border-primary/30 hover:border-primary hover:bg-primary/5"
+                onClick={() => navigate('/auto-capture')}
+              >
+                <Camera className="w-5 h-5 mr-3 text-primary" />
+                <div className="text-left">
+                  <span className="font-semibold text-foreground">Captura automática</span>
+                  <p className="text-xs text-muted-foreground">La app toma la foto cuando esté lista</p>
                 </div>
-                <div>
-                  <p className="font-semibold text-foreground">
-                    Arrastra tu imagen aquí
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    o haz clic para seleccionar un archivo
+              </Button>
+
+              {/* Manual upload area */}
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                className={`
+                  relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 cursor-pointer
+                  ${isDragging 
+                    ? 'border-primary bg-accent/50' 
+                    : 'border-border hover:border-primary/50 hover:bg-secondary/50'
+                  }
+                `}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleInputChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <div className="space-y-4">
+                  <div className="w-16 h-16 rounded-2xl bg-accent mx-auto flex items-center justify-center">
+                    <Upload className="w-8 h-8 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      Subir desde galería
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Arrastra o haz clic para seleccionar
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    JPG, PNG o WEBP • Máximo 10MB
                   </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  JPG, PNG o WEBP • Máximo 10MB
-                </p>
               </div>
             </div>
           ) : (
