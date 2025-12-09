@@ -309,11 +309,12 @@ const AutoCapture = () => {
           autoPlay
           playsInline
           muted
-          className="absolute inset-0 w-full h-full object-cover opacity-0"
+          className="absolute inset-0 w-full h-full object-cover"
         />
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full object-cover"
+          style={{ display: isCameraReady ? 'block' : 'none' }}
         />
         
         {/* Guide overlay */}
