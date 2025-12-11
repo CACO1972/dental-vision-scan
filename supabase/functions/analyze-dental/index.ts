@@ -1,3 +1,4 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -21,16 +22,16 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY is not configured');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      console.error('OPENAI_API_KEY is not configured');
       return new Response(
         JSON.stringify({ error: 'AI service not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Analyzing dental image with AI...');
+    console.log('Analyzing dental image with OpenAI GPT-4 Vision...');
 
     const systemPrompt = `Eres un asistente de análisis dental para pacientes. Tu rol es analizar imágenes dentales y proporcionar observaciones orientativas.
 
@@ -75,14 +76,16 @@ Si la imagen no muestra dientes o no es útil para análisis dental, responde:
 
 Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y menciona que no se observan problemas evidentes en la imagen, pero que esto NO significa que no existan y debe consultar con un profesional.`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const imageUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
+        model: 'gpt-4o',
         messages: [
           { role: 'system', content: systemPrompt },
           { 
@@ -95,18 +98,20 @@ Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y
               {
                 type: 'image_url',
                 image_url: {
-                  url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
+                  url: imageUrl,
+                  detail: 'high'
                 }
               }
             ]
           }
         ],
+        max_tokens: 2000,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
+      console.error('OpenAI API error:', response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -114,10 +119,10 @@ Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      if (response.status === 402) {
+      if (response.status === 401) {
         return new Response(
-          JSON.stringify({ error: 'Servicio no disponible temporalmente.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'Error de autenticación con el servicio de IA.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
@@ -131,14 +136,14 @@ Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y
     const aiResponse = data.choices?.[0]?.message?.content;
 
     if (!aiResponse) {
-      console.error('No response from AI');
+      console.error('No response from OpenAI');
       return new Response(
         JSON.stringify({ error: 'No se recibió respuesta del análisis' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('AI Response received:', aiResponse.substring(0, 200));
+    console.log('OpenAI Response received:', aiResponse.substring(0, 200));
 
     // Parse the JSON response from AI
     let analysisResult;
@@ -158,7 +163,7 @@ Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y
       
       analysisResult = JSON.parse(cleanedResponse);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError);
+      console.error('Failed to parse OpenAI response:', parseError);
       console.error('Raw response:', aiResponse);
       return new Response(
         JSON.stringify({ 
