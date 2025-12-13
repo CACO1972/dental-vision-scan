@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { useImage, Hallazgo } from '@/context/ImageContext';
-import { Scan, ArrowLeft, AlertCircle, Info, CheckCircle2, AlertTriangle, ImageOff } from 'lucide-react';
+import { useImage, Hallazgo, ViewType } from '@/context/ImageContext';
+import { Scan, ArrowLeft, AlertCircle, CheckCircle2, AlertTriangle, ImageOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const tipoConfig: Record<string, { color: string; colorClass: string; label: string }> = {
   caries: { color: '#ef4444', colorClass: 'bg-destructive', label: 'Posible caries' },
@@ -18,91 +19,47 @@ const confianzaLabel: Record<string, string> = {
   baja: 'Baja confianza',
 };
 
+const viewLabels: Record<ViewType, string> = {
+  frontal: 'Frontal',
+  superior: 'Superior',
+  inferior: 'Inferior',
+};
+
 const Analisis = () => {
   const navigate = useNavigate();
-  const { selectedImageUrl, analysisResult } = useImage();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { selectedImageUrl, analysisResult, capturedImages } = useImage();
+  const [selectedView, setSelectedView] = useState<ViewType | 'all'>('all');
 
   useEffect(() => {
-    if (!selectedImageUrl || !analysisResult) {
-      navigate('/subir-foto');
-      return;
-    }
-
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
+    // Check if we have either single image or multiple captured images
+    const hasSingleImage = selectedImageUrl && analysisResult;
+    const hasMultipleImages = capturedImages.length > 0 && analysisResult;
     
-    img.onload = () => {
-      const containerWidth = container.clientWidth;
-      const maxHeight = 400;
-      
-      const aspectRatio = img.width / img.height;
-      let canvasWidth = containerWidth;
-      let canvasHeight = containerWidth / aspectRatio;
-      
-      if (canvasHeight > maxHeight) {
-        canvasHeight = maxHeight;
-        canvasWidth = maxHeight * aspectRatio;
-      }
+    if (!hasSingleImage && !hasMultipleImages) {
+      navigate('/subir-foto');
+    }
+  }, [selectedImageUrl, analysisResult, capturedImages, navigate]);
 
-      canvas.width = canvasWidth;
-      canvas.height = canvasHeight;
+  if (!analysisResult) return null;
 
-      // Draw image
-      ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
-
-      // Draw detection rectangles from AI analysis
-      if (analysisResult.hallazgos && analysisResult.hallazgos.length > 0) {
-        analysisResult.hallazgos.forEach((hallazgo: Hallazgo) => {
-          const config = tipoConfig[hallazgo.tipo] || tipoConfig.otro;
-          const coords = hallazgo.coordenadas;
-          
-          if (coords) {
-            const rectX = coords.x * canvasWidth;
-            const rectY = coords.y * canvasHeight;
-            const rectWidth = coords.width * canvasWidth;
-            const rectHeight = coords.height * canvasHeight;
-
-            // Draw semi-transparent fill
-            ctx.fillStyle = config.color + '25';
-            ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
-
-            // Draw border
-            ctx.strokeStyle = config.color;
-            ctx.lineWidth = 3;
-            ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
-
-            // Draw label background
-            ctx.font = 'bold 11px Plus Jakarta Sans, sans-serif';
-            const textWidth = ctx.measureText(config.label).width;
-            ctx.fillStyle = config.color;
-            ctx.fillRect(rectX, rectY - 20, textWidth + 10, 18);
-
-            // Draw label text
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText(config.label, rectX + 5, rectY - 6);
-          }
-        });
-      }
-
-      setIsLoaded(true);
-    };
-
-    img.src = selectedImageUrl;
-  }, [selectedImageUrl, analysisResult, navigate]);
-
-  if (!selectedImageUrl || !analysisResult) return null;
-
+  const hasMultipleImages = capturedImages.length > 0;
   const hasFindings = analysisResult.hallazgos && analysisResult.hallazgos.length > 0;
+
+  // Filter findings by view
+  const filteredFindings = selectedView === 'all' 
+    ? analysisResult.hallazgos 
+    : analysisResult.hallazgos.filter((h: Hallazgo) => h.vista === selectedView);
+
+  // Get current display image
+  const getCurrentImage = () => {
+    if (hasMultipleImages) {
+      if (selectedView === 'all') {
+        return capturedImages[0]?.imageUrl;
+      }
+      return capturedImages.find(img => img.view === selectedView)?.imageUrl;
+    }
+    return selectedImageUrl;
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -110,7 +67,7 @@ const Analisis = () => {
       <header className="w-full py-4 px-6 border-b border-border bg-card">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
           <button 
-            onClick={() => navigate('/subir-foto')}
+            onClick={() => navigate(hasMultipleImages ? '/revisar-fotos' : '/subir-foto')}
             className="w-10 h-10 rounded-lg hover:bg-secondary flex items-center justify-center transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
@@ -132,9 +89,11 @@ const Analisis = () => {
                 ? 'Análisis completado' 
                 : 'No se pudo analizar la imagen'}
             </h1>
-            <p className="text-muted-foreground">
-              {analysisResult.mensajeGeneral}
-            </p>
+            {hasMultipleImages && (
+              <p className="text-sm text-primary font-medium">
+                {capturedImages.length} vistas analizadas
+              </p>
+            )}
           </div>
 
           {/* Image quality warning */}
@@ -160,32 +119,89 @@ const Analisis = () => {
             </div>
           )}
 
+          {/* View selector for multiple images */}
+          {hasMultipleImages && (
+            <div className="flex gap-2 flex-wrap justify-center">
+              <button
+                onClick={() => setSelectedView('all')}
+                className={cn(
+                  'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                  selectedView === 'all'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                )}
+              >
+                Todos ({analysisResult.hallazgos.length})
+              </button>
+              {capturedImages.map(img => {
+                const viewFindings = analysisResult.hallazgos.filter((h: Hallazgo) => h.vista === img.view);
+                return (
+                  <button
+                    key={img.view}
+                    onClick={() => setSelectedView(img.view)}
+                    className={cn(
+                      'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                      selectedView === img.view
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {viewLabels[img.view]} ({viewFindings.length})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Canvas */}
-            <div 
-              ref={containerRef}
-              className="bg-card rounded-2xl border border-border overflow-hidden"
-            >
-              <canvas 
-                ref={canvasRef} 
-                className="w-full h-auto block"
-              />
-              {!isLoaded && (
-                <div className="h-64 flex items-center justify-center">
-                  <div className="animate-pulse-gentle text-muted-foreground">
-                    Cargando imagen...
-                  </div>
+            {/* Image display */}
+            <div className="space-y-4">
+              {hasMultipleImages ? (
+                <div className="grid grid-cols-3 gap-2">
+                  {capturedImages.map(img => (
+                    <button
+                      key={img.view}
+                      onClick={() => setSelectedView(img.view)}
+                      className={cn(
+                        'aspect-square rounded-xl overflow-hidden border-2 transition-all',
+                        selectedView === img.view || selectedView === 'all'
+                          ? 'border-primary ring-2 ring-primary/30'
+                          : 'border-border opacity-60 hover:opacity-100'
+                      )}
+                    >
+                      <img
+                        src={img.imageUrl}
+                        alt={`Vista ${viewLabels[img.view]}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-card rounded-2xl border border-border overflow-hidden">
+                  <img
+                    src={selectedImageUrl || ''}
+                    alt="Imagen dental"
+                    className="w-full h-auto max-h-96 object-contain"
+                  />
                 </div>
               )}
+
+              {/* General message */}
+              <div className="bg-card rounded-xl p-4 border border-border">
+                <p className="text-sm text-muted-foreground whitespace-pre-line">
+                  {analysisResult.mensajeGeneral}
+                </p>
+              </div>
             </div>
 
             {/* Detections list */}
             <div className="space-y-4">
               <h2 className="font-semibold text-foreground flex items-center gap-2">
-                {hasFindings ? (
+                {filteredFindings.length > 0 ? (
                   <>
                     <AlertCircle className="w-5 h-5 text-primary" />
-                    Hallazgos detectados ({analysisResult.hallazgos.length})
+                    Hallazgos detectados ({filteredFindings.length})
                   </>
                 ) : (
                   <>
@@ -195,9 +211,9 @@ const Analisis = () => {
                 )}
               </h2>
               
-              {hasFindings ? (
-                <div className="space-y-3">
-                  {analysisResult.hallazgos.map((hallazgo: Hallazgo, index: number) => {
+              {filteredFindings.length > 0 ? (
+                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                  {filteredFindings.map((hallazgo: Hallazgo, index: number) => {
                     const config = tipoConfig[hallazgo.tipo] || tipoConfig.otro;
                     return (
                       <div 
@@ -207,17 +223,24 @@ const Analisis = () => {
                         <div className="flex items-start gap-3">
                           <div className={`w-4 h-4 rounded-full ${config.colorClass} shrink-0 mt-0.5`} />
                           <div className="flex-1">
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
                               <h3 className="font-semibold text-foreground">{config.label}</h3>
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                hallazgo.confianza === 'alta' 
-                                  ? 'bg-success/20 text-success' 
-                                  : hallazgo.confianza === 'media'
-                                    ? 'bg-warning/20 text-warning'
-                                    : 'bg-muted text-muted-foreground'
-                              }`}>
-                                {confianzaLabel[hallazgo.confianza]}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                {hallazgo.vista && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                    {viewLabels[hallazgo.vista]}
+                                  </span>
+                                )}
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                  hallazgo.confianza === 'alta' 
+                                    ? 'bg-success/20 text-success' 
+                                    : hallazgo.confianza === 'media'
+                                      ? 'bg-warning/20 text-warning'
+                                      : 'bg-muted text-muted-foreground'
+                                }`}>
+                                  {confianzaLabel[hallazgo.confianza]}
+                                </span>
+                              </div>
                             </div>
                             <p className="text-sm text-muted-foreground mt-1">{hallazgo.descripcion}</p>
                             {hallazgo.ubicacion && (
@@ -234,7 +257,8 @@ const Analisis = () => {
               ) : (
                 <div className="bg-success/10 rounded-xl p-4 border border-success/20">
                   <p className="text-sm text-foreground">
-                    No se detectaron problemas evidentes en la imagen. Sin embargo, esto <strong>no garantiza</strong> que no existan problemas dentales. 
+                    No se detectaron problemas evidentes en {selectedView === 'all' ? 'las imágenes' : 'esta vista'}. 
+                    Sin embargo, esto <strong>no garantiza</strong> que no existan problemas dentales. 
                     Una evaluación profesional presencial es necesaria para un diagnóstico completo.
                   </p>
                 </div>
@@ -276,7 +300,7 @@ const Analisis = () => {
               size="lg"
               onClick={() => navigate('/subir-foto')}
             >
-              Analizar otra foto
+              Analizar otras fotos
             </Button>
           </div>
         </div>

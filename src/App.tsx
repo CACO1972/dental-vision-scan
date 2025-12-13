@@ -7,6 +7,7 @@ import { ImageProvider } from "@/context/ImageContext";
 import Welcome from "./pages/Welcome";
 import SubirFoto from "./pages/SubirFoto";
 import AutoCapture from "./pages/AutoCapture";
+import RevisarFotos from "./pages/RevisarFotos";
 import Analisis from "./pages/Analisis";
 import Explicacion from "./pages/Explicacion";
 import NotFound from "./pages/NotFound";
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/" element={<Welcome />} />
             <Route path="/subir-foto" element={<SubirFoto />} />
             <Route path="/auto-capture" element={<AutoCapture />} />
+            <Route path="/revisar-fotos" element={<RevisarFotos />} />
             <Route path="/analisis" element={<Analisis />} />
             <Route path="/explicacion" element={<Explicacion />} />
             <Route path="*" element={<NotFound />} />
