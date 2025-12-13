@@ -1,15 +1,21 @@
 import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useImage } from '@/context/ImageContext';
+import { useImage, ViewType, CapturedImage } from '@/context/ImageContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Camera, Sun, SunDim } from 'lucide-react';
+import { ArrowLeft, Camera, Sun, SunDim, Check, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type ViewType = 'frontal' | 'superior' | 'inferior';
+const VIEW_ORDER: ViewType[] = ['frontal', 'superior', 'inferior'];
+
+const viewLabels: Record<ViewType, string> = {
+  frontal: 'Frontal',
+  superior: 'Superior',
+  inferior: 'Inferior',
+};
 
 const viewInstructions: Record<ViewType, string> = {
   frontal: 'Sonríe y separa ligeramente los labios. Coloca los dientes dentro del recuadro frontal.',
-  superior: 'Gira el teléfono, mantén la cámara abajo, abre bien la boca mirando al techo y coloca los dientes superiores dentro del recuadro.',
+  superior: 'Inclina la cabeza hacia atrás, abre bien la boca mirando al techo y coloca los dientes superiores dentro del recuadro.',
   inferior: 'Mira hacia el piso, abre bien la boca y baja la lengua. Coloca los dientes inferiores dentro del recuadro.',
 };
 
@@ -18,7 +24,6 @@ const STABILITY_TIME_MS = 1500;
 const BRIGHTNESS_MIN = 60;
 const SAMPLE_SIZE = 50;
 
-// Play shutter sound using Web Audio API
 const playShutterSound = () => {
   try {
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -43,7 +48,7 @@ const playShutterSound = () => {
 
 const AutoCapture = () => {
   const navigate = useNavigate();
-  const { setSelectedImageUrl, setSelectedImageBase64 } = useImage();
+  const { addCapturedImage, capturedImages, clearCapturedImages } = useImage();
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -53,13 +58,17 @@ const AutoCapture = () => {
   const stableStartRef = useRef<number | null>(null);
   const hasCapturedRef = useRef(false);
 
-  const [selectedView, setSelectedView] = useState<ViewType>('frontal');
+  const [currentViewIndex, setCurrentViewIndex] = useState(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [stabilityProgress, setStabilityProgress] = useState(0);
   const [isLightAdequate, setIsLightAdequate] = useState(false);
   const [statusText, setStatusText] = useState('Iniciando cámara...');
   const [isCapturing, setIsCapturing] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [showCaptureSuccess, setShowCaptureSuccess] = useState(false);
+
+  const currentView = VIEW_ORDER[currentViewIndex];
+  const isLastView = currentViewIndex === VIEW_ORDER.length - 1;
 
   const stopCamera = () => {
     if (animationRef.current) {
@@ -74,11 +83,12 @@ const AutoCapture = () => {
 
   const handleCancel = () => {
     stopCamera();
+    clearCapturedImages();
     navigate('/subir-foto');
   };
 
   const getGuidePosition = () => {
-    switch (selectedView) {
+    switch (currentView) {
       case 'superior':
         return 'top-[15%]';
       case 'inferior':
@@ -86,6 +96,47 @@ const AutoCapture = () => {
       default:
         return 'top-[30%]';
     }
+  };
+
+  const resetForNextCapture = () => {
+    hasCapturedRef.current = false;
+    stableStartRef.current = null;
+    prevFrameRef.current = null;
+    setStabilityProgress(0);
+    setIsCapturing(false);
+    setShowCaptureSuccess(false);
+    setStatusText('Coloca los dientes en el recuadro');
+  };
+
+  const captureImage = () => {
+    if (!canvasRef.current) return;
+    
+    hasCapturedRef.current = true;
+    setIsCapturing(true);
+    setStatusText('¡Capturado!');
+    playShutterSound();
+
+    const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.9);
+    const base64 = dataUrl.split(',')[1];
+    
+    const capturedImage: CapturedImage = {
+      view: currentView,
+      imageUrl: dataUrl,
+      imageBase64: base64,
+    };
+    
+    addCapturedImage(capturedImage);
+    setShowCaptureSuccess(true);
+
+    setTimeout(() => {
+      if (isLastView) {
+        stopCamera();
+        navigate('/revisar-fotos');
+      } else {
+        setCurrentViewIndex(prev => prev + 1);
+        resetForNextCapture();
+      }
+    }, 1000);
   };
 
   useEffect(() => {
@@ -129,7 +180,7 @@ const AutoCapture = () => {
       } catch (error) {
         console.error('Camera error:', error);
         if (mounted) {
-          setCameraError('No se pudo acceder a la cámara. Revisa los permisos de tu navegador o carga una foto desde la galería.');
+          setCameraError('No se pudo acceder a la cámara. Revisa los permisos de tu navegador.');
         }
       }
     };
@@ -142,7 +193,6 @@ const AutoCapture = () => {
     };
   }, []);
 
-  // Analysis loop
   useEffect(() => {
     if (!isCameraReady || isCapturing) return;
 
@@ -158,13 +208,10 @@ const AutoCapture = () => {
         return;
       }
 
-      // Draw current frame
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Sample pixels for analysis
       const currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
       
-      // Calculate brightness
       let totalBrightness = 0;
       const step = Math.floor(currentFrame.data.length / 4 / SAMPLE_SIZE);
       for (let i = 0; i < currentFrame.data.length; i += step * 4) {
@@ -177,7 +224,6 @@ const AutoCapture = () => {
       const lightOk = avgBrightness >= BRIGHTNESS_MIN;
       setIsLightAdequate(lightOk);
 
-      // Calculate stability (frame difference)
       let stability = 0;
       if (prevFrameRef.current) {
         let totalDiff = 0;
@@ -212,29 +258,8 @@ const AutoCapture = () => {
       setStabilityProgress(stability);
       prevFrameRef.current = currentFrame;
 
-      // Check capture conditions
       if (stability >= 100 && lightOk && !hasCapturedRef.current) {
-        hasCapturedRef.current = true;
-        setIsCapturing(true);
-        setStatusText('Listo, capturando...');
-        
-        // Play shutter sound
-        playShutterSound();
-
-        // Get image data
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        const base64 = dataUrl.split(',')[1];
-        
-        // Store in context
-        setSelectedImageUrl(dataUrl);
-        setSelectedImageBase64(base64);
-        
-        // Stop camera and navigate
-        stopCamera();
-        
-        setTimeout(() => {
-          navigate('/analisis');
-        }, 500);
+        captureImage();
         return;
       }
 
@@ -248,7 +273,7 @@ const AutoCapture = () => {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isCameraReady, isCapturing, navigate, setSelectedImageUrl, setSelectedImageBase64]);
+  }, [isCameraReady, isCapturing, currentView, isLastView]);
 
   if (cameraError) {
     return (
@@ -272,34 +297,59 @@ const AutoCapture = () => {
           <Button variant="ghost" size="icon" onClick={handleCancel}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-lg font-semibold text-foreground">Toma automática de foto</h1>
+          <h1 className="text-lg font-semibold text-foreground">Captura guiada</h1>
         </div>
-        <p className="text-sm text-muted-foreground px-2">
-          La app tomará la foto sola cuando la imagen esté clara y estable.
-        </p>
       </div>
 
-      {/* View selector */}
-      <div className="px-4 pb-2">
-        <div className="flex gap-2 bg-muted/50 rounded-lg p-1">
-          {(['frontal', 'superior', 'inferior'] as ViewType[]).map((view) => (
-            <button
-              key={view}
-              onClick={() => setSelectedView(view)}
-              className={cn(
-                'flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors',
-                selectedView === view
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {view === 'frontal' ? 'Frontal' : view === 'superior' ? 'Superior' : 'Inferior'}
-            </button>
-          ))}
+      {/* Progress indicators */}
+      <div className="px-4 pb-4">
+        <div className="flex items-center justify-center gap-3">
+          {VIEW_ORDER.map((view, index) => {
+            const isCaptured = capturedImages.some(img => img.view === view);
+            const isCurrent = index === currentViewIndex;
+            
+            return (
+              <div key={view} className="flex items-center gap-2">
+                <div className={cn(
+                  'w-8 h-8 rounded-full flex items-center justify-center transition-all',
+                  isCaptured ? 'bg-green-500 text-white' :
+                  isCurrent ? 'bg-primary text-primary-foreground' :
+                  'bg-muted text-muted-foreground'
+                )}>
+                  {isCaptured ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <span className="text-sm font-medium">{index + 1}</span>
+                  )}
+                </div>
+                <span className={cn(
+                  'text-sm font-medium hidden sm:inline',
+                  isCurrent ? 'text-foreground' : 'text-muted-foreground'
+                )}>
+                  {viewLabels[view]}
+                </span>
+                {index < VIEW_ORDER.length - 1 && (
+                  <div className={cn(
+                    'w-8 h-0.5 rounded',
+                    isCaptured ? 'bg-green-500' : 'bg-muted'
+                  )} />
+                )}
+              </div>
+            );
+          })}
         </div>
-        <p className="text-xs text-muted-foreground mt-2 px-1">
-          {viewInstructions[selectedView]}
-        </p>
+      </div>
+
+      {/* Current view instruction */}
+      <div className="px-4 pb-2">
+        <div className="bg-card border border-border rounded-xl p-4 text-center">
+          <h2 className="font-semibold text-foreground mb-1">
+            Vista {viewLabels[currentView]}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {viewInstructions[currentView]}
+          </p>
+        </div>
       </div>
 
       {/* Camera view */}
@@ -317,20 +367,31 @@ const AutoCapture = () => {
           style={{ display: isCameraReady ? 'block' : 'none' }}
         />
         
+        {/* Success overlay */}
+        {showCaptureSuccess && (
+          <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center z-20">
+            <div className="bg-green-500 text-white rounded-full p-4">
+              <Check className="w-12 h-12" />
+            </div>
+          </div>
+        )}
+        
         {/* Guide overlay */}
         <div className={cn(
           'absolute left-1/2 -translate-x-1/2 w-[80%] aspect-[4/3] border-2 rounded-xl transition-all duration-300',
           getGuidePosition(),
-          isCapturing 
-            ? 'border-green-500 bg-green-500/10' 
-            : stabilityProgress > 50 
-              ? 'border-primary bg-primary/5' 
-              : 'border-white/50 bg-white/5'
+          showCaptureSuccess
+            ? 'border-green-500 bg-green-500/10'
+            : isCapturing 
+              ? 'border-green-500 bg-green-500/10' 
+              : stabilityProgress > 50 
+                ? 'border-primary bg-primary/5' 
+                : 'border-white/50 bg-white/5'
         )}>
           <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
             <span className={cn(
               'text-sm font-medium px-3 py-1 rounded-full',
-              isCapturing 
+              showCaptureSuccess || isCapturing 
                 ? 'bg-green-500 text-white'
                 : stabilityProgress > 50 
                   ? 'bg-primary text-primary-foreground' 
@@ -369,12 +430,17 @@ const AutoCapture = () => {
             <div 
               className={cn(
                 'h-full transition-all duration-200 rounded-full',
-                stabilityProgress >= 100 ? 'bg-green-500' : 'bg-primary'
+                stabilityProgress >= 100 || showCaptureSuccess ? 'bg-green-500' : 'bg-primary'
               )}
               style={{ width: `${stabilityProgress}%` }}
             />
           </div>
         </div>
+
+        {/* Photo count */}
+        <p className="text-center text-sm text-muted-foreground">
+          Foto {currentViewIndex + 1} de {VIEW_ORDER.length}
+        </p>
 
         {/* Cancel button */}
         <Button variant="outline" className="w-full" onClick={handleCancel}>

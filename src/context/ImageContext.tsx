@@ -1,10 +1,19 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
+export type ViewType = 'frontal' | 'superior' | 'inferior';
+
+export interface CapturedImage {
+  view: ViewType;
+  imageUrl: string;
+  imageBase64: string;
+}
+
 export interface Hallazgo {
   tipo: 'caries' | 'calculo' | 'desgaste' | 'gingivitis' | 'otro';
   confianza: 'alta' | 'media' | 'baja';
   descripcion: string;
   ubicacion: string;
+  vista?: ViewType;
   coordenadas: {
     x: number;
     y: number;
@@ -23,12 +32,23 @@ export interface AnalisisResultado {
 }
 
 interface ImageContextType {
+  // Legacy single image support
   selectedImageUrl: string | null;
   setSelectedImageUrl: (url: string | null) => void;
   selectedImageBase64: string | null;
   setSelectedImageBase64: (base64: string | null) => void;
+  
+  // Multi-image capture support
+  capturedImages: CapturedImage[];
+  addCapturedImage: (image: CapturedImage) => void;
+  clearCapturedImages: () => void;
+  getCapturedImage: (view: ViewType) => CapturedImage | undefined;
+  
+  // Analysis result
   analysisResult: AnalisisResultado | null;
   setAnalysisResult: (result: AnalisisResultado | null) => void;
+  
+  // Clear all
   clearImage: () => void;
 }
 
@@ -37,7 +57,29 @@ const ImageContext = createContext<ImageContextType | undefined>(undefined);
 export const ImageProvider = ({ children }: { children: ReactNode }) => {
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
+  const [capturedImages, setCapturedImages] = useState<CapturedImage[]>([]);
   const [analysisResult, setAnalysisResult] = useState<AnalisisResultado | null>(null);
+
+  const addCapturedImage = (image: CapturedImage) => {
+    setCapturedImages(prev => {
+      // Replace if same view exists
+      const filtered = prev.filter(img => img.view !== image.view);
+      return [...filtered, image];
+    });
+  };
+
+  const clearCapturedImages = () => {
+    capturedImages.forEach(img => {
+      if (img.imageUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(img.imageUrl);
+      }
+    });
+    setCapturedImages([]);
+  };
+
+  const getCapturedImage = (view: ViewType) => {
+    return capturedImages.find(img => img.view === view);
+  };
 
   const clearImage = () => {
     if (selectedImageUrl) {
@@ -45,6 +87,7 @@ export const ImageProvider = ({ children }: { children: ReactNode }) => {
     }
     setSelectedImageUrl(null);
     setSelectedImageBase64(null);
+    clearCapturedImages();
     setAnalysisResult(null);
   };
 
@@ -54,6 +97,10 @@ export const ImageProvider = ({ children }: { children: ReactNode }) => {
       setSelectedImageUrl, 
       selectedImageBase64,
       setSelectedImageBase64,
+      capturedImages,
+      addCapturedImage,
+      clearCapturedImages,
+      getCapturedImage,
       analysisResult,
       setAnalysisResult,
       clearImage 
