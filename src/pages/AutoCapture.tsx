@@ -19,9 +19,9 @@ const viewLabels: Record<ViewType, string> = {
 };
 
 const viewInstructions: Record<ViewType, string> = {
-  frontal: 'Sonríe y separa ligeramente los labios. Coloca los dientes dentro del recuadro frontal.',
-  superior: 'Inclina la cabeza hacia atrás, abre bien la boca mirando al techo y coloca los dientes superiores dentro del recuadro.',
-  inferior: 'Mira hacia el piso, abre bien la boca y baja la lengua. Coloca los dientes inferiores dentro del recuadro.',
+  frontal: 'Sonríe mostrando los 6 dientes frontales superiores e inferiores. Deben verse completos desde canino a canino.',
+  superior: 'Inclina la cabeza hacia atrás y abre bien la boca. Deben verse al menos 10 dientes superiores hasta el primer molar.',
+  inferior: 'Mira hacia abajo, abre la boca y baja la lengua. Deben verse al menos 10 dientes inferiores hasta el primer molar.',
 };
 
 const viewImages: Record<ViewType, string> = {
@@ -31,9 +31,9 @@ const viewImages: Record<ViewType, string> = {
 };
 
 const viewVoiceTexts: Record<ViewType, string> = {
-  frontal: 'Vamos a tomar la foto frontal. Sonríe naturalmente y separa ligeramente los labios para mostrar tus dientes. Mantén la posición hasta que la foto se capture automáticamente.',
-  superior: 'Ahora vamos con la vista superior. Inclina tu cabeza hacia atrás, abre bien la boca mirando hacia el techo. Si puedes, voltea el celular para que la cámara quede mirando de abajo hacia arriba.',
-  inferior: 'Por último, la vista inferior. Mira hacia el piso, abre bien la boca y baja la lengua para mostrar tus dientes inferiores.',
+  frontal: 'Vamos a tomar la foto frontal. Sonríe ampliamente mostrando tus dientes. Necesitamos ver los seis dientes anteriores superiores completos, de canino a canino, y al menos parte de los seis dientes anteriores inferiores. Separa los labios para que se vean bien.',
+  superior: 'Ahora vamos con la vista superior. Inclina tu cabeza hacia atrás, abre bien la boca mirando hacia el techo. Necesitamos ver las caras oclusales de al menos diez dientes superiores, desde los incisivos hasta el primer molar de cada lado.',
+  inferior: 'Por último, la vista inferior. Mira hacia abajo, abre bien la boca y baja la lengua. Necesitamos ver las caras oclusales de al menos diez dientes inferiores, desde los incisivos hasta el primer molar de cada lado.',
 };
 
 // Umbral más alto = menos sensible al movimiento (más permisivo)
