@@ -19,9 +19,15 @@ const viewLabels: Record<ViewType, string> = {
 };
 
 const viewInstructions: Record<ViewType, string> = {
-  frontal: 'Sonríe mostrando los 6 dientes frontales superiores e inferiores. Deben verse completos desde canino a canino.',
-  superior: 'Inclina la cabeza hacia atrás y abre bien la boca. Deben verse al menos 10 dientes superiores hasta el primer molar.',
-  inferior: 'Mira hacia abajo, abre la boca y baja la lengua. Deben verse al menos 10 dientes inferiores hasta el primer molar.',
+  frontal: 'Usa 2 cucharas limpias para separar las mejillas hacia afuera. Sonríe mostrando los dientes desde canino a canino.',
+  superior: 'Inclina la cabeza hacia atrás. Usa tus dedos o cucharas para levantar el labio superior hacia la nariz.',
+  inferior: 'Mira hacia abajo. Usa tus dedos o cucharas para bajar el labio inferior hacia el mentón.',
+};
+
+const viewTips: Record<ViewType, string> = {
+  frontal: '🥄 Tip: Coloca la parte trasera de 2 cucharas en cada lado de la boca para separar las mejillas',
+  superior: '🥄 Tip: Con una cuchara o los dedos índices, levanta el labio superior hacia la nariz',
+  inferior: '🥄 Tip: Con una cuchara o los dedos índices, baja el labio inferior hacia el mentón',
 };
 
 const viewImages: Record<ViewType, string> = {
@@ -31,9 +37,9 @@ const viewImages: Record<ViewType, string> = {
 };
 
 const viewVoiceTexts: Record<ViewType, string> = {
-  frontal: 'Vamos a tomar la foto frontal. Sonríe ampliamente mostrando tus dientes. Necesitamos ver los seis dientes anteriores superiores completos, de canino a canino, y al menos parte de los seis dientes anteriores inferiores. Separa los labios para que se vean bien.',
-  superior: 'Ahora vamos con la vista superior. Inclina tu cabeza hacia atrás, abre bien la boca mirando hacia el techo. Necesitamos ver las caras oclusales de al menos diez dientes superiores, desde los incisivos hasta el primer molar de cada lado.',
-  inferior: 'Por último, la vista inferior. Mira hacia abajo, abre bien la boca y baja la lengua. Necesitamos ver las caras oclusales de al menos diez dientes inferiores, desde los incisivos hasta el primer molar de cada lado.',
+  frontal: 'Vamos a tomar la foto frontal. Te recomendamos usar dos cucharas limpias como separadores. Coloca la parte trasera de cada cuchara en los lados de tu boca para separar las mejillas hacia afuera. Esto nos permitirá ver mejor tus dientes. Necesitamos ver los seis dientes anteriores superiores completos, de canino a canino.',
+  superior: 'Ahora la vista superior. Inclina tu cabeza hacia atrás mirando al techo. Usa tus dedos índices o una cuchara para levantar el labio superior hacia la nariz. Esto expone las caras de los dientes superiores. Necesitamos ver al menos diez dientes hasta el primer molar.',
+  inferior: 'Por último, la vista inferior. Mira hacia abajo. Usa tus dedos índices o una cuchara para bajar el labio inferior hacia el mentón. Mantén la lengua hacia atrás. Necesitamos ver al menos diez dientes inferiores hasta el primer molar.',
 };
 
 // Umbral más alto = menos sensible al movimiento (más permisivo)
@@ -579,13 +585,12 @@ const AutoCapture = () => {
               {viewInstructions[currentView]}
             </p>
 
-            {currentView === 'superior' && (
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
-                <p className="text-xs text-primary">
-                  💡 Tip: Voltea el celular para que la cámara quede mirando de abajo hacia arriba
-                </p>
-              </div>
-            )}
+            {/* View-specific tip */}
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+              <p className="text-xs text-primary">
+                {viewTips[currentView]}
+              </p>
+            </div>
 
             {/* Voice guidance button */}
             <Button 

@@ -221,12 +221,21 @@ const IntroCaptura = () => {
 
         {/* Tips */}
         <div className="mt-4 bg-primary/5 border border-primary/20 rounded-xl p-3">
-          <h4 className="font-semibold text-foreground mb-2 text-sm">💡 Consejos</h4>
+          <h4 className="font-semibold text-foreground mb-2 text-sm">🥄 Separador casero</h4>
+          <ul className="text-xs text-muted-foreground space-y-1">
+            <li>• Usa <strong>2 cucharas limpias</strong> como separadores de mejillas</li>
+            <li>• Coloca la parte trasera de la cuchara hacia afuera</li>
+            <li>• También puedes usar tus dedos para separar los labios</li>
+            <li>• Aplica bálsamo labial para mayor comodidad</li>
+          </ul>
+        </div>
+        
+        <div className="mt-3 bg-muted/50 border border-border rounded-xl p-3">
+          <h4 className="font-semibold text-foreground mb-2 text-sm">💡 Consejos generales</h4>
           <ul className="text-xs text-muted-foreground space-y-1">
             <li>• Busca un lugar con buena iluminación natural</li>
-            <li>• Mantén el dispositivo estable por 2-3 segundos</li>
             <li>• Si puedes, pide ayuda a alguien para las fotos</li>
-            <li>• Para el maxilar superior, voltea el celular</li>
+            <li>• Mantén el dispositivo estable durante la captura</li>
           </ul>
         </div>
 
