@@ -11,7 +11,7 @@ type ViewType = 'frontal' | 'superior' | 'inferior';
 const viewRequirements: Record<ViewType, { description: string; minTeeth: number }> = {
   frontal: {
     description: 'Vista frontal: se deben ver las caras vestibulares de los 6 dientes anteriores superiores (de canino a canino) y al menos parte de los 6 dientes anteriores inferiores',
-    minTeeth: 10
+    minTeeth: 8
   },
   superior: {
     description: 'Vista oclusal superior: se deben ver las caras oclusales de al menos 10 dientes superiores, desde los incisivos hasta el primer molar de cada lado',
