@@ -2,8 +2,13 @@ import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useImage, ViewType, CapturedImage } from '@/context/ImageContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Camera, Sun, SunDim, Check, Circle } from 'lucide-react';
+import { ArrowLeft, Camera, Sun, SunDim, Check, Play, RotateCcw, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+
+import dentalFrontalView from '@/assets/dental-frontal-view.png';
+import dentalSuperiorView from '@/assets/dental-superior-view.png';
+import dentalInferiorView from '@/assets/dental-inferior-view.png';
 
 const VIEW_ORDER: ViewType[] = ['frontal', 'superior', 'inferior'];
 
@@ -17,6 +22,18 @@ const viewInstructions: Record<ViewType, string> = {
   frontal: 'Sonríe y separa ligeramente los labios. Coloca los dientes dentro del recuadro frontal.',
   superior: 'Inclina la cabeza hacia atrás, abre bien la boca mirando al techo y coloca los dientes superiores dentro del recuadro.',
   inferior: 'Mira hacia el piso, abre bien la boca y baja la lengua. Coloca los dientes inferiores dentro del recuadro.',
+};
+
+const viewImages: Record<ViewType, string> = {
+  frontal: dentalFrontalView,
+  superior: dentalSuperiorView,
+  inferior: dentalInferiorView,
+};
+
+const viewVoiceTexts: Record<ViewType, string> = {
+  frontal: 'Vamos a tomar la foto frontal. Sonríe naturalmente y separa ligeramente los labios para mostrar tus dientes. Mantén la posición hasta que la foto se capture automáticamente.',
+  superior: 'Ahora vamos con la vista superior. Inclina tu cabeza hacia atrás, abre bien la boca mirando hacia el techo. Si puedes, voltea el celular para que la cámara quede mirando de abajo hacia arriba.',
+  inferior: 'Por último, la vista inferior. Mira hacia el piso, abre bien la boca y baja la lengua para mostrar tus dientes inferiores.',
 };
 
 // Umbral más alto = menos sensible al movimiento
@@ -48,9 +65,11 @@ const playShutterSound = () => {
   }
 };
 
+type CaptureStage = 'instructions' | 'capturing' | 'review';
+
 const AutoCapture = () => {
   const navigate = useNavigate();
-  const { addCapturedImage, capturedImages, clearCapturedImages } = useImage();
+  const { addCapturedImage, capturedImages, clearCapturedImages, getCapturedImage } = useImage();
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -59,8 +78,10 @@ const AutoCapture = () => {
   const animationRef = useRef<number | null>(null);
   const stableStartRef = useRef<number | null>(null);
   const hasCapturedRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [currentViewIndex, setCurrentViewIndex] = useState(0);
+  const [stage, setStage] = useState<CaptureStage>('instructions');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [stabilityProgress, setStabilityProgress] = useState(0);
   const [isLightAdequate, setIsLightAdequate] = useState(false);
@@ -68,6 +89,9 @@ const AutoCapture = () => {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [showCaptureSuccess, setShowCaptureSuccess] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [currentCapturedImage, setCurrentCapturedImage] = useState<string | null>(null);
 
   const currentView = VIEW_ORDER[currentViewIndex];
   const isLastView = currentViewIndex === VIEW_ORDER.length - 1;
@@ -81,12 +105,63 @@ const AutoCapture = () => {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    setIsCameraReady(false);
+  };
+
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setIsPlayingAudio(false);
   };
 
   const handleCancel = () => {
     stopCamera();
+    stopAudio();
     clearCapturedImages();
     navigate('/subir-foto');
+  };
+
+  const playVoiceGuidance = async () => {
+    if (isLoadingAudio || isPlayingAudio) {
+      stopAudio();
+      return;
+    }
+
+    setIsLoadingAudio(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('text-to-speech', {
+        body: { text: viewVoiceTexts[currentView] }
+      });
+
+      if (error) throw error;
+
+      const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
+      audioRef.current = audio;
+      
+      audio.onended = () => {
+        setIsPlayingAudio(false);
+        audioRef.current = null;
+      };
+      
+      audio.onerror = () => {
+        setIsPlayingAudio(false);
+        audioRef.current = null;
+      };
+
+      await audio.play();
+      setIsPlayingAudio(true);
+    } catch (err) {
+      console.error('Error playing voice guidance:', err);
+    } finally {
+      setIsLoadingAudio(false);
+    }
+  };
+
+  const startCapture = () => {
+    stopAudio();
+    setStage('capturing');
   };
 
   const getGuidePosition = () => {
@@ -100,7 +175,7 @@ const AutoCapture = () => {
     }
   };
 
-  const resetForNextCapture = () => {
+  const resetForRetake = () => {
     hasCapturedRef.current = false;
     stableStartRef.current = null;
     prevFrameRef.current = null;
@@ -108,6 +183,28 @@ const AutoCapture = () => {
     setIsCapturing(false);
     setShowCaptureSuccess(false);
     setStatusText('Coloca los dientes en el recuadro');
+    setCurrentCapturedImage(null);
+    setStage('capturing');
+  };
+
+  const approvePhoto = () => {
+    if (isLastView) {
+      stopCamera();
+      stopAudio();
+      navigate('/revisar-fotos');
+    } else {
+      // Move to next view instructions
+      setCurrentViewIndex(prev => prev + 1);
+      hasCapturedRef.current = false;
+      stableStartRef.current = null;
+      prevFrameRef.current = null;
+      setStabilityProgress(0);
+      setIsCapturing(false);
+      setShowCaptureSuccess(false);
+      setStatusText('Coloca los dientes en el recuadro');
+      setCurrentCapturedImage(null);
+      setStage('instructions');
+    }
   };
 
   const captureImage = () => {
@@ -128,20 +225,20 @@ const AutoCapture = () => {
     };
     
     addCapturedImage(capturedImage);
+    setCurrentCapturedImage(dataUrl);
     setShowCaptureSuccess(true);
 
+    // Go to review stage after capture animation
     setTimeout(() => {
-      if (isLastView) {
-        stopCamera();
-        navigate('/revisar-fotos');
-      } else {
-        setCurrentViewIndex(prev => prev + 1);
-        resetForNextCapture();
-      }
-    }, 1000);
+      setStage('review');
+      setShowCaptureSuccess(false);
+    }, 800);
   };
 
+  // Start camera when entering capture stage
   useEffect(() => {
+    if (stage !== 'capturing') return;
+
     let mounted = true;
 
     const startCamera = async () => {
@@ -193,10 +290,11 @@ const AutoCapture = () => {
       mounted = false;
       stopCamera();
     };
-  }, []);
+  }, [stage]);
 
+  // Frame analysis for auto-capture
   useEffect(() => {
-    if (!isCameraReady || isCapturing) return;
+    if (stage !== 'capturing' || !isCameraReady || isCapturing) return;
 
     const analyzeFrame = () => {
       if (!canvasRef.current || !videoRef.current || hasCapturedRef.current) return;
@@ -275,7 +373,15 @@ const AutoCapture = () => {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isCameraReady, isCapturing, currentView, isLastView]);
+  }, [stage, isCameraReady, isCapturing, currentView]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      stopAudio();
+    };
+  }, []);
 
   if (cameraError) {
     return (
@@ -291,6 +397,205 @@ const AutoCapture = () => {
     );
   }
 
+  // INSTRUCTIONS STAGE
+  if (stage === 'instructions') {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        {/* Header */}
+        <div className="p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={handleCancel}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-lg font-semibold text-foreground">Captura guiada</h1>
+          </div>
+        </div>
+
+        {/* Progress indicators */}
+        <div className="px-4 pb-4">
+          <div className="flex items-center justify-center gap-3">
+            {VIEW_ORDER.map((view, index) => {
+              const isCaptured = capturedImages.some(img => img.view === view);
+              const isCurrent = index === currentViewIndex;
+              
+              return (
+                <div key={view} className="flex items-center gap-2">
+                  <div className={cn(
+                    'w-8 h-8 rounded-full flex items-center justify-center transition-all',
+                    isCaptured ? 'bg-green-500 text-white' :
+                    isCurrent ? 'bg-primary text-primary-foreground' :
+                    'bg-muted text-muted-foreground'
+                  )}>
+                    {isCaptured ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <span className="text-sm font-medium">{index + 1}</span>
+                    )}
+                  </div>
+                  <span className={cn(
+                    'text-sm font-medium hidden sm:inline',
+                    isCurrent ? 'text-foreground' : 'text-muted-foreground'
+                  )}>
+                    {viewLabels[view]}
+                  </span>
+                  {index < VIEW_ORDER.length - 1 && (
+                    <div className={cn(
+                      'w-8 h-0.5 rounded',
+                      isCaptured ? 'bg-green-500' : 'bg-muted'
+                    )} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Instructions content */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
+          <div className="bg-card border rounded-2xl p-6 max-w-sm w-full text-center space-y-4">
+            <h2 className="text-xl font-bold text-foreground">
+              Vista {viewLabels[currentView]}
+            </h2>
+            
+            <div className="w-48 h-48 mx-auto rounded-xl overflow-hidden bg-muted">
+              <img 
+                src={viewImages[currentView]} 
+                alt={`Posición para vista ${viewLabels[currentView]}`}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              {viewInstructions[currentView]}
+            </p>
+
+            {currentView === 'superior' && (
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+                <p className="text-xs text-primary">
+                  💡 Tip: Voltea el celular para que la cámara quede mirando de abajo hacia arriba
+                </p>
+              </div>
+            )}
+
+            {/* Voice guidance button */}
+            <Button 
+              variant="outline" 
+              className="w-full gap-2"
+              onClick={playVoiceGuidance}
+              disabled={isLoadingAudio}
+            >
+              <Play className={cn('w-4 h-4', isPlayingAudio && 'text-primary')} />
+              {isLoadingAudio ? 'Cargando...' : isPlayingAudio ? 'Reproduciendo...' : 'Escuchar instrucciones'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Bottom action */}
+        <div className="p-4 space-y-3 bg-card border-t">
+          <Button className="w-full gap-2" size="lg" onClick={startCapture}>
+            <Camera className="w-5 h-5" />
+            Comenzar captura
+          </Button>
+          <Button variant="outline" className="w-full" onClick={handleCancel}>
+            Cancelar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // REVIEW STAGE
+  if (stage === 'review' && currentCapturedImage) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        {/* Header */}
+        <div className="p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={handleCancel}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-lg font-semibold text-foreground">Revisar foto</h1>
+          </div>
+        </div>
+
+        {/* Progress indicators */}
+        <div className="px-4 pb-4">
+          <div className="flex items-center justify-center gap-3">
+            {VIEW_ORDER.map((view, index) => {
+              const isCaptured = capturedImages.some(img => img.view === view);
+              const isCurrent = index === currentViewIndex;
+              
+              return (
+                <div key={view} className="flex items-center gap-2">
+                  <div className={cn(
+                    'w-8 h-8 rounded-full flex items-center justify-center transition-all',
+                    isCaptured ? 'bg-green-500 text-white' :
+                    isCurrent ? 'bg-primary text-primary-foreground' :
+                    'bg-muted text-muted-foreground'
+                  )}>
+                    {isCaptured ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <span className="text-sm font-medium">{index + 1}</span>
+                    )}
+                  </div>
+                  <span className={cn(
+                    'text-sm font-medium hidden sm:inline',
+                    isCurrent ? 'text-foreground' : 'text-muted-foreground'
+                  )}>
+                    {viewLabels[view]}
+                  </span>
+                  {index < VIEW_ORDER.length - 1 && (
+                    <div className={cn(
+                      'w-8 h-0.5 rounded',
+                      isCaptured ? 'bg-green-500' : 'bg-muted'
+                    )} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Photo preview */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-4">
+          <div className="w-full max-w-sm space-y-4">
+            <div className="aspect-[4/3] rounded-2xl overflow-hidden border-4 border-green-500 bg-black">
+              <img 
+                src={currentCapturedImage} 
+                alt={`Vista ${viewLabels[currentView]} capturada`}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            
+            <div className="text-center">
+              <h2 className="text-lg font-semibold text-foreground">
+                Vista {viewLabels[currentView]}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                ¿La foto se ve bien?
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom actions */}
+        <div className="p-4 space-y-3 bg-card border-t">
+          <Button className="w-full gap-2" size="lg" onClick={approvePhoto}>
+            <Check className="w-5 h-5" />
+            {isLastView ? 'Aprobar y finalizar' : 'Aprobar y continuar'}
+            {!isLastView && <ArrowRight className="w-4 h-4" />}
+          </Button>
+          <Button variant="outline" className="w-full gap-2" onClick={resetForRetake}>
+            <RotateCcw className="w-4 h-4" />
+            Volver a tomar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // CAPTURING STAGE
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
