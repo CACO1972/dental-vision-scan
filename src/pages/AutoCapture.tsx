@@ -623,6 +623,89 @@ const AutoCapture = () => {
       </div>
     );
   }
+  // VALIDATION STAGE - mostrar imagen capturada y resultado de validación
+  if (stage === 'validating') {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        {/* Header */}
+        <div className="p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={handleCancel}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-lg font-semibold text-foreground">
+              Verificando vista {viewLabels[currentView]}
+            </h1>
+          </div>
+        </div>
+        
+        {/* Imagen capturada */}
+        <div className="flex-1 flex flex-col items-center justify-center p-4 space-y-6">
+          {pendingImage && (
+            <div className="relative w-full max-w-md aspect-[4/3] rounded-xl overflow-hidden border-4 border-muted">
+              <img 
+                src={pendingImage.dataUrl} 
+                alt="Imagen capturada"
+                className="w-full h-full object-cover"
+              />
+              {isValidating && (
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                  <div className="text-center space-y-3">
+                    <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
+                    <p className="text-foreground font-medium">Analizando dientes visibles...</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Resultado de validación - error */}
+          {!isValidating && validationError && (
+            <div className="w-full max-w-md space-y-4">
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-destructive">{validationError}</p>
+                    {validationSuggestion && (
+                      <p className="text-sm text-muted-foreground mt-1">{validationSuggestion}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={handleCancel}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  className="flex-1"
+                  onClick={retryCapture}
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Repetir foto
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {/* Resultado de validación - éxito */}
+          {!isValidating && showCaptureSuccess && (
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto">
+                <Check className="w-6 h-6 text-white" />
+              </div>
+              <p className="text-green-600 font-medium">{statusText}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // CAPTURING STAGE
   return (
@@ -834,89 +917,6 @@ const AutoCapture = () => {
       </div>
     </div>
   );
-  
-  // VALIDATION STAGE - mostrar imagen capturada y resultado de validación
-  if (stage === 'validating') {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        {/* Header */}
-        <div className="p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleCancel}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-lg font-semibold text-foreground">
-              Verificando vista {viewLabels[currentView]}
-            </h1>
-          </div>
-        </div>
-        
-        {/* Imagen capturada */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 space-y-6">
-          {pendingImage && (
-            <div className="relative w-full max-w-md aspect-[4/3] rounded-xl overflow-hidden border-4 border-muted">
-              <img 
-                src={pendingImage.dataUrl} 
-                alt="Imagen capturada"
-                className="w-full h-full object-cover"
-              />
-              {isValidating && (
-                <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
-                    <p className="text-foreground font-medium">Analizando dientes visibles...</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* Resultado de validación */}
-          {!isValidating && validationError && (
-            <div className="w-full max-w-md space-y-4">
-              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-destructive">{validationError}</p>
-                    {validationSuggestion && (
-                      <p className="text-sm text-muted-foreground mt-1">{validationSuggestion}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <Button 
-                  variant="outline" 
-                  className="flex-1"
-                  onClick={handleCancel}
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  className="flex-1"
-                  onClick={retryCapture}
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Repetir foto
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {!isValidating && showCaptureSuccess && (
-            <div className="text-center space-y-2">
-              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto">
-                <Check className="w-6 h-6 text-white" />
-              </div>
-              <p className="text-green-600 font-medium">{statusText}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
 };
 
 export default AutoCapture;
