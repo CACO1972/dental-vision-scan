@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ImageProvider } from "@/context/ImageContext";
 import Welcome from "./pages/Welcome";
 import SubirFoto from "./pages/SubirFoto";
+import IntroCaptura from "./pages/IntroCaptura";
 import AutoCapture from "./pages/AutoCapture";
 import RevisarFotos from "./pages/RevisarFotos";
 import Analisis from "./pages/Analisis";
@@ -24,6 +25,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Welcome />} />
             <Route path="/subir-foto" element={<SubirFoto />} />
+            <Route path="/intro-captura" element={<IntroCaptura />} />
             <Route path="/auto-capture" element={<AutoCapture />} />
             <Route path="/revisar-fotos" element={<RevisarFotos />} />
             <Route path="/analisis" element={<Analisis />} />

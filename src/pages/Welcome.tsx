@@ -76,7 +76,7 @@ const Welcome = () => {
             variant="hero" 
             size="xl" 
             className="w-full"
-            onClick={() => navigate('/subir-foto')}
+            onClick={() => navigate('/intro-captura')}
           >
             Comenzar revisión
           </Button>
