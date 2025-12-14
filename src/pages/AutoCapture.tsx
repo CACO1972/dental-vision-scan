@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useImage, ViewType, CapturedImage } from '@/context/ImageContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Camera, Sun, SunDim, Check, Play, RotateCcw, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Camera, Sun, SunDim, Check, Play, RotateCcw, ArrowRight, CircleCheck, CircleX, Contrast } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -111,6 +111,8 @@ const AutoCapture = () => {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [isQualityOk, setIsQualityOk] = useState(false);
+  const [currentBrightness, setCurrentBrightness] = useState(0);
+  const [currentContrast, setCurrentContrast] = useState(0);
 
   const currentView = VIEW_ORDER[currentViewIndex];
   const isLastView = currentViewIndex === VIEW_ORDER.length - 1;
@@ -335,6 +337,8 @@ const AutoCapture = () => {
       const qualityOk = checkQualityFromFrameData(avgBrightness, contrast);
       
       setIsLightAdequate(lightOk);
+      setCurrentBrightness(Math.round(avgBrightness));
+      setCurrentContrast(Math.round(contrast));
       setIsQualityOk(qualityOk);
 
       let stability = 0;
@@ -633,6 +637,40 @@ const AutoCapture = () => {
             {statusText}
           </span>
         </div>
+        
+        {/* Quality indicators */}
+        {isCameraReady && !showCaptureSuccess && (
+          <div className="absolute top-36 left-1/2 -translate-x-1/2 z-10 flex gap-3">
+            <div className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg',
+              currentBrightness >= QUALITY_BRIGHTNESS_MIN && currentBrightness <= QUALITY_BRIGHTNESS_MAX
+                ? 'bg-green-500/90 text-white'
+                : 'bg-red-500/90 text-white'
+            )}>
+              {currentBrightness >= QUALITY_BRIGHTNESS_MIN && currentBrightness <= QUALITY_BRIGHTNESS_MAX ? (
+                <CircleCheck className="w-3.5 h-3.5" />
+              ) : (
+                <CircleX className="w-3.5 h-3.5" />
+              )}
+              <Sun className="w-3.5 h-3.5" />
+              <span>Luz</span>
+            </div>
+            <div className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg',
+              currentContrast >= QUALITY_CONTRAST_MIN
+                ? 'bg-green-500/90 text-white'
+                : 'bg-red-500/90 text-white'
+            )}>
+              {currentContrast >= QUALITY_CONTRAST_MIN ? (
+                <CircleCheck className="w-3.5 h-3.5" />
+              ) : (
+                <CircleX className="w-3.5 h-3.5" />
+              )}
+              <Contrast className="w-3.5 h-3.5" />
+              <span>Contraste</span>
+            </div>
+          </div>
+        )}
         
         {/* Guide overlay */}
         <div className={cn(
