@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useImage, ViewType, CapturedImage } from '@/context/ImageContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Camera, Sun, SunDim, Check, Play, RotateCcw, ArrowRight, CircleCheck, CircleX, Contrast } from 'lucide-react';
+import { ArrowLeft, Camera, Sun, SunDim, Check, Play, RotateCcw, ArrowRight, CircleCheck, CircleX, Contrast, Focus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -72,6 +72,7 @@ type CaptureStage = 'instructions' | 'capturing';
 const QUALITY_BRIGHTNESS_MIN = 25;
 const QUALITY_BRIGHTNESS_MAX = 250;
 const QUALITY_CONTRAST_MIN = 20;
+const QUALITY_SHARPNESS_MIN = 8; // Umbral mínimo de nitidez (varianza Laplaciana)
 
 interface ImageQualityResult {
   isValid: boolean;
@@ -80,10 +81,11 @@ interface ImageQualityResult {
 }
 
 // Validación rápida de calidad en tiempo real (usa datos ya calculados del frame)
-const checkQualityFromFrameData = (brightness: number, contrast: number): boolean => {
+const checkQualityFromFrameData = (brightness: number, contrast: number, sharpness: number): boolean => {
   return brightness >= QUALITY_BRIGHTNESS_MIN && 
          brightness <= QUALITY_BRIGHTNESS_MAX && 
-         contrast >= QUALITY_CONTRAST_MIN;
+         contrast >= QUALITY_CONTRAST_MIN &&
+         sharpness >= QUALITY_SHARPNESS_MIN;
 };
 
 const AutoCapture = () => {
@@ -113,6 +115,7 @@ const AutoCapture = () => {
   const [isQualityOk, setIsQualityOk] = useState(false);
   const [currentBrightness, setCurrentBrightness] = useState(0);
   const [currentContrast, setCurrentContrast] = useState(0);
+  const [currentSharpness, setCurrentSharpness] = useState(0);
 
   const currentView = VIEW_ORDER[currentViewIndex];
   const isLastView = currentViewIndex === VIEW_ORDER.length - 1;
@@ -316,10 +319,11 @@ const AutoCapture = () => {
       const currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const step = Math.floor(currentFrame.data.length / 4 / SAMPLE_SIZE);
       
-      // Calcular brillo y contraste en una sola pasada (rápido)
+      // Calcular brillo, contraste y nitidez en una sola pasada (rápido)
       let totalBrightness = 0;
       let minBrightness = 255;
       let maxBrightness = 0;
+      const grayscale: number[] = [];
       
       for (let i = 0; i < currentFrame.data.length; i += step * 4) {
         const r = currentFrame.data[i];
@@ -329,16 +333,28 @@ const AutoCapture = () => {
         totalBrightness += brightness;
         minBrightness = Math.min(minBrightness, brightness);
         maxBrightness = Math.max(maxBrightness, brightness);
+        grayscale.push(brightness);
       }
       
       const avgBrightness = totalBrightness / SAMPLE_SIZE;
       const contrast = maxBrightness - minBrightness;
+      
+      // Calcular nitidez usando varianza Laplaciana simplificada
+      // Mide la diferencia entre píxeles adyacentes (más diferencia = más nítido)
+      let sharpnessSum = 0;
+      for (let i = 1; i < grayscale.length - 1; i++) {
+        const laplacian = Math.abs(grayscale[i - 1] - 2 * grayscale[i] + grayscale[i + 1]);
+        sharpnessSum += laplacian;
+      }
+      const sharpness = sharpnessSum / (grayscale.length - 2);
+      
       const lightOk = avgBrightness >= BRIGHTNESS_MIN;
-      const qualityOk = checkQualityFromFrameData(avgBrightness, contrast);
+      const qualityOk = checkQualityFromFrameData(avgBrightness, contrast, sharpness);
       
       setIsLightAdequate(lightOk);
       setCurrentBrightness(Math.round(avgBrightness));
       setCurrentContrast(Math.round(contrast));
+      setCurrentSharpness(Math.round(sharpness * 10) / 10);
       setIsQualityOk(qualityOk);
 
       let stability = 0;
@@ -668,6 +684,20 @@ const AutoCapture = () => {
               )}
               <Contrast className="w-3.5 h-3.5" />
               <span>Contraste</span>
+            </div>
+            <div className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg',
+              currentSharpness >= QUALITY_SHARPNESS_MIN
+                ? 'bg-green-500/90 text-white'
+                : 'bg-red-500/90 text-white'
+            )}>
+              {currentSharpness >= QUALITY_SHARPNESS_MIN ? (
+                <CircleCheck className="w-3.5 h-3.5" />
+              ) : (
+                <CircleX className="w-3.5 h-3.5" />
+              )}
+              <Focus className="w-3.5 h-3.5" />
+              <span>Enfoque</span>
             </div>
           </div>
         )}
