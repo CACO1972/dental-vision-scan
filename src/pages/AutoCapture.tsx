@@ -38,8 +38,8 @@ const viewVoiceTexts: Record<ViewType, string> = {
 
 // Umbral más alto = menos sensible al movimiento (más permisivo)
 const STABILITY_THRESHOLD = 30;
-// Tiempo para capturar = 1 segundo estable
-const STABILITY_TIME_MS = 1000;
+// Tiempo para capturar = 3 segundos estable
+const STABILITY_TIME_MS = 3000;
 // Brillo mínimo más permisivo para capturar en más condiciones
 const BRIGHTNESS_MIN = 30;
 const SAMPLE_SIZE = 60;
@@ -343,16 +343,19 @@ const AutoCapture = () => {
           }
           const elapsed = Date.now() - stableStartRef.current;
           stability = Math.min(100, (elapsed / STABILITY_TIME_MS) * 100);
+          const secondsRemaining = Math.ceil((STABILITY_TIME_MS - elapsed) / 1000);
           
-          if (stability < 50) {
-            setStatusText('Mantén la posición...');
+          if (stability < 33) {
+            setStatusText(`✅ ¡Perfecto! Mantén así... ${secondsRemaining}s`);
+          } else if (stability < 66) {
+            setStatusText(`✅ ¡Muy bien! No te muevas... ${secondsRemaining}s`);
           } else if (stability < 100) {
-            setStatusText('Casi listo...');
+            setStatusText(`✅ ¡Casi listo! ${secondsRemaining}s`);
           }
         } else {
           stableStartRef.current = null;
           stability = 0;
-          setStatusText('Moviendo...');
+          setStatusText('📷 Ajusta la posición...');
         }
       }
       
