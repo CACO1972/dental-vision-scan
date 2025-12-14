@@ -192,16 +192,6 @@ const AutoCapture = () => {
     setStage('capturing');
   };
 
-  const getGuidePosition = () => {
-    switch (currentView) {
-      case 'superior':
-        return 'top-[25%]';
-      case 'inferior':
-        return 'top-[35%]';
-      default:
-        return 'top-[28%]';
-    }
-  };
 
   const captureImage = async () => {
     if (!canvasRef.current) return;
@@ -710,57 +700,43 @@ const AutoCapture = () => {
   // CAPTURING STAGE
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <div className="p-4 space-y-2">
+      {/* Compact Header with progress */}
+      <div className="px-3 py-2 flex items-center justify-between">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCancel}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        
+        {/* Compact progress indicators */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={handleCancel}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="text-lg font-semibold text-foreground">Captura guiada</h1>
-        </div>
-      </div>
-
-      {/* Progress indicators */}
-      <div className="px-4 pb-4">
-        <div className="flex items-center justify-center gap-3">
           {VIEW_ORDER.map((view, index) => {
             const isCaptured = capturedImages.some(img => img.view === view);
             const isCurrent = index === currentViewIndex;
             
             return (
-              <div key={view} className="flex items-center gap-2">
+              <div key={view} className="flex items-center gap-1">
                 <div className={cn(
-                  'w-8 h-8 rounded-full flex items-center justify-center transition-all',
+                  'w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium',
                   isCaptured ? 'bg-green-500 text-white' :
                   isCurrent ? 'bg-primary text-primary-foreground' :
                   'bg-muted text-muted-foreground'
                 )}>
-                  {isCaptured ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    <span className="text-sm font-medium">{index + 1}</span>
-                  )}
+                  {isCaptured ? <Check className="w-3 h-3" /> : index + 1}
                 </div>
-                <span className={cn(
-                  'text-sm font-medium hidden sm:inline',
-                  isCurrent ? 'text-foreground' : 'text-muted-foreground'
-                )}>
-                  {viewLabels[view]}
-                </span>
                 {index < VIEW_ORDER.length - 1 && (
-                  <div className={cn(
-                    'w-8 h-0.5 rounded',
-                    isCaptured ? 'bg-green-500' : 'bg-muted'
-                  )} />
+                  <div className={cn('w-4 h-0.5', isCaptured ? 'bg-green-500' : 'bg-muted')} />
                 )}
               </div>
             );
           })}
         </div>
+        
+        <span className="text-xs text-muted-foreground w-8 text-right">
+          {currentViewIndex + 1}/{VIEW_ORDER.length}
+        </span>
       </div>
 
-      {/* Camera view */}
-      <div className="flex-1 relative mx-4 mb-4 rounded-2xl overflow-hidden bg-black min-h-0">
+      {/* Camera view - MAXIMIZED */}
+      <div className="flex-1 relative mx-2 rounded-xl overflow-hidden bg-black">
         <video
           ref={videoRef}
           autoPlay
@@ -774,18 +750,6 @@ const AutoCapture = () => {
           style={{ display: isCameraReady ? 'block' : 'none' }}
         />
         
-        {/* Top instruction overlay - always visible */}
-        <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 via-black/60 to-transparent z-10">
-          <div className="text-center">
-            <h2 className="font-bold text-white text-lg drop-shadow-lg">
-              Vista {viewLabels[currentView]}
-            </h2>
-            <p className="text-white/90 text-sm mt-1 leading-snug drop-shadow-md">
-              {viewInstructions[currentView]}
-            </p>
-          </div>
-        </div>
-        
         {/* Success overlay */}
         {showCaptureSuccess && (
           <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center z-20">
@@ -795,123 +759,85 @@ const AutoCapture = () => {
           </div>
         )}
         
-        {/* Status badge - positioned inside camera safely */}
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-10">
-          <span className={cn(
-            'text-base font-semibold px-4 py-2 rounded-full shadow-lg',
-            showCaptureSuccess || isCapturing 
-              ? 'bg-green-500 text-white'
+        {/* Minimal guide frame - centered, larger */}
+        <div className={cn(
+          'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[92%] aspect-[4/3] border-3 rounded-xl transition-all duration-300',
+          showCaptureSuccess
+            ? 'border-green-500'
+            : isCapturing 
+              ? 'border-green-500' 
               : stabilityProgress > 50 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-black/70 text-white'
-          )}>
-            {statusText}
-          </span>
-        </div>
+                ? 'border-primary' 
+                : 'border-white/70'
+        )} />
         
-        {/* Quality indicators */}
-        {isCameraReady && !showCaptureSuccess && (
-          <div className="absolute top-36 left-1/2 -translate-x-1/2 z-10 flex gap-3">
-            <div className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg',
-              currentBrightness >= QUALITY_BRIGHTNESS_MIN && currentBrightness <= QUALITY_BRIGHTNESS_MAX
-                ? 'bg-green-500/90 text-white'
-                : 'bg-red-500/90 text-white'
-            )}>
-              {currentBrightness >= QUALITY_BRIGHTNESS_MIN && currentBrightness <= QUALITY_BRIGHTNESS_MAX ? (
-                <CircleCheck className="w-3.5 h-3.5" />
-              ) : (
-                <CircleX className="w-3.5 h-3.5" />
-              )}
-              <Sun className="w-3.5 h-3.5" />
-              <span>Luz</span>
-            </div>
-            <div className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg',
-              currentContrast >= QUALITY_CONTRAST_MIN
-                ? 'bg-green-500/90 text-white'
-                : 'bg-red-500/90 text-white'
-            )}>
-              {currentContrast >= QUALITY_CONTRAST_MIN ? (
-                <CircleCheck className="w-3.5 h-3.5" />
-              ) : (
-                <CircleX className="w-3.5 h-3.5" />
-              )}
-              <Contrast className="w-3.5 h-3.5" />
-              <span>Contraste</span>
-            </div>
-            <div className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg',
-              currentSharpness >= QUALITY_SHARPNESS_MIN
-                ? 'bg-green-500/90 text-white'
-                : 'bg-red-500/90 text-white'
-            )}>
-              {currentSharpness >= QUALITY_SHARPNESS_MIN ? (
-                <CircleCheck className="w-3.5 h-3.5" />
-              ) : (
-                <CircleX className="w-3.5 h-3.5" />
-              )}
-              <Focus className="w-3.5 h-3.5" />
-              <span>Enfoque</span>
-            </div>
+        {/* Countdown timer - bottom center of camera, only when counting */}
+        {stabilityProgress > 0 && stabilityProgress < 100 && !showCaptureSuccess && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+            <span className="text-4xl font-bold text-white drop-shadow-lg">
+              {Math.ceil((STABILITY_TIME_MS - (stabilityProgress / 100 * STABILITY_TIME_MS)) / 1000)}s
+            </span>
           </div>
         )}
-        
-        {/* Guide overlay */}
-        <div className={cn(
-          'absolute left-1/2 -translate-x-1/2 w-[85%] aspect-[4/3] border-4 rounded-2xl transition-all duration-300',
-          getGuidePosition(),
-          showCaptureSuccess
-            ? 'border-green-500 bg-green-500/10'
-            : isCapturing 
-              ? 'border-green-500 bg-green-500/10' 
-              : stabilityProgress > 50 
-                ? 'border-primary bg-primary/5' 
-                : 'border-white/60 bg-white/5'
-        )} />
       </div>
 
-      {/* Bottom indicators */}
-      <div className="p-4 space-y-4 bg-card border-t">
-        {/* Light indicator */}
-        <div className="flex items-center justify-center gap-2">
-          {isLightAdequate ? (
-            <>
-              <Sun className="w-5 h-5 text-yellow-500" />
-              <span className="text-sm text-foreground">Luz adecuada</span>
-            </>
-          ) : (
-            <>
-              <SunDim className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Luz insuficiente</span>
-            </>
+      {/* Bottom panel - compact info outside camera */}
+      <div className="px-3 py-2 space-y-2 bg-card border-t">
+        {/* View title and quality indicators row */}
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-foreground text-sm">
+            Vista {viewLabels[currentView]}
+          </span>
+          
+          {/* Quality indicators - compact */}
+          {isCameraReady && !showCaptureSuccess && (
+            <div className="flex gap-1.5">
+              <div className={cn(
+                'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs',
+                currentBrightness >= QUALITY_BRIGHTNESS_MIN && currentBrightness <= QUALITY_BRIGHTNESS_MAX
+                  ? 'bg-green-500/20 text-green-600'
+                  : 'bg-red-500/20 text-red-600'
+              )}>
+                <Sun className="w-3 h-3" />
+              </div>
+              <div className={cn(
+                'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs',
+                currentContrast >= QUALITY_CONTRAST_MIN
+                  ? 'bg-green-500/20 text-green-600'
+                  : 'bg-red-500/20 text-red-600'
+              )}>
+                <Contrast className="w-3 h-3" />
+              </div>
+              <div className={cn(
+                'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs',
+                currentSharpness >= QUALITY_SHARPNESS_MIN
+                  ? 'bg-green-500/20 text-green-600'
+                  : 'bg-red-500/20 text-red-600'
+              )}>
+                <Focus className="w-3 h-3" />
+              </div>
+            </div>
           )}
         </div>
-
-        {/* Stability progress */}
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Estabilidad</span>
-            <span>{Math.round(stabilityProgress)}%</span>
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div 
-              className={cn(
-                'h-full transition-all duration-200 rounded-full',
-                stabilityProgress >= 100 || showCaptureSuccess ? 'bg-green-500' : 'bg-primary'
-              )}
-              style={{ width: `${stabilityProgress}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Photo count */}
+        
+        {/* Status text */}
         <p className="text-center text-sm text-muted-foreground">
-          Foto {currentViewIndex + 1} de {VIEW_ORDER.length}
+          {statusText}
         </p>
 
+        {/* Stability progress bar */}
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+          <div 
+            className={cn(
+              'h-full transition-all duration-200 rounded-full',
+              stabilityProgress >= 100 || showCaptureSuccess ? 'bg-green-500' : 'bg-primary'
+            )}
+            style={{ width: `${stabilityProgress}%` }}
+          />
+        </div>
+
         {/* Cancel button */}
-        <Button variant="outline" className="w-full" onClick={handleCancel}>
+        <Button variant="outline" size="sm" className="w-full" onClick={handleCancel}>
           Cancelar
         </Button>
       </div>
