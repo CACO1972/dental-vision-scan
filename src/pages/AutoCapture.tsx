@@ -19,10 +19,12 @@ const viewInstructions: Record<ViewType, string> = {
   inferior: 'Mira hacia el piso, abre bien la boca y baja la lengua. Coloca los dientes inferiores dentro del recuadro.',
 };
 
-const STABILITY_THRESHOLD = 15;
-const STABILITY_TIME_MS = 1500;
-const BRIGHTNESS_MIN = 60;
-const SAMPLE_SIZE = 50;
+// Más estricto: umbral más bajo = requiere más quietud
+const STABILITY_THRESHOLD = 8;
+// Más tiempo para capturar = 2.5 segundos estable
+const STABILITY_TIME_MS = 2500;
+const BRIGHTNESS_MIN = 50;
+const SAMPLE_SIZE = 100;
 
 const playShutterSound = () => {
   try {
@@ -90,11 +92,11 @@ const AutoCapture = () => {
   const getGuidePosition = () => {
     switch (currentView) {
       case 'superior':
-        return 'top-[15%]';
+        return 'top-[25%]';
       case 'inferior':
-        return 'top-[45%]';
+        return 'top-[35%]';
       default:
-        return 'top-[30%]';
+        return 'top-[28%]';
     }
   };
 
@@ -340,20 +342,8 @@ const AutoCapture = () => {
         </div>
       </div>
 
-      {/* Current view instruction */}
-      <div className="px-4 pb-2">
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
-          <h2 className="font-semibold text-foreground mb-1">
-            Vista {viewLabels[currentView]}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {viewInstructions[currentView]}
-          </p>
-        </div>
-      </div>
-
       {/* Camera view */}
-      <div className="flex-1 relative mx-4 mb-4 rounded-xl overflow-hidden bg-black">
+      <div className="flex-1 relative mx-4 mb-4 rounded-2xl overflow-hidden bg-black min-h-0">
         <video
           ref={videoRef}
           autoPlay
@@ -367,6 +357,18 @@ const AutoCapture = () => {
           style={{ display: isCameraReady ? 'block' : 'none' }}
         />
         
+        {/* Top instruction overlay - always visible */}
+        <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 via-black/60 to-transparent z-10">
+          <div className="text-center">
+            <h2 className="font-bold text-white text-lg drop-shadow-lg">
+              Vista {viewLabels[currentView]}
+            </h2>
+            <p className="text-white/90 text-sm mt-1 leading-snug drop-shadow-md">
+              {viewInstructions[currentView]}
+            </p>
+          </div>
+        </div>
+        
         {/* Success overlay */}
         {showCaptureSuccess && (
           <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center z-20">
@@ -376,9 +378,23 @@ const AutoCapture = () => {
           </div>
         )}
         
+        {/* Status badge - positioned inside camera safely */}
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-10">
+          <span className={cn(
+            'text-base font-semibold px-4 py-2 rounded-full shadow-lg',
+            showCaptureSuccess || isCapturing 
+              ? 'bg-green-500 text-white'
+              : stabilityProgress > 50 
+                ? 'bg-primary text-primary-foreground' 
+                : 'bg-black/70 text-white'
+          )}>
+            {statusText}
+          </span>
+        </div>
+        
         {/* Guide overlay */}
         <div className={cn(
-          'absolute left-1/2 -translate-x-1/2 w-[80%] aspect-[4/3] border-2 rounded-xl transition-all duration-300',
+          'absolute left-1/2 -translate-x-1/2 w-[85%] aspect-[4/3] border-4 rounded-2xl transition-all duration-300',
           getGuidePosition(),
           showCaptureSuccess
             ? 'border-green-500 bg-green-500/10'
@@ -386,21 +402,8 @@ const AutoCapture = () => {
               ? 'border-green-500 bg-green-500/10' 
               : stabilityProgress > 50 
                 ? 'border-primary bg-primary/5' 
-                : 'border-white/50 bg-white/5'
-        )}>
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
-            <span className={cn(
-              'text-sm font-medium px-3 py-1 rounded-full',
-              showCaptureSuccess || isCapturing 
-                ? 'bg-green-500 text-white'
-                : stabilityProgress > 50 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-black/50 text-white'
-            )}>
-              {statusText}
-            </span>
-          </div>
-        </div>
+                : 'border-white/60 bg-white/5'
+        )} />
       </div>
 
       {/* Bottom indicators */}
