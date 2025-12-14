@@ -19,12 +19,12 @@ const viewInstructions: Record<ViewType, string> = {
   inferior: 'Mira hacia el piso, abre bien la boca y baja la lengua. Coloca los dientes inferiores dentro del recuadro.',
 };
 
-// Más estricto: umbral más bajo = requiere más quietud
-const STABILITY_THRESHOLD = 8;
-// Más tiempo para capturar = 2.5 segundos estable
-const STABILITY_TIME_MS = 2500;
-const BRIGHTNESS_MIN = 50;
-const SAMPLE_SIZE = 100;
+// Umbral más alto = menos sensible al movimiento
+const STABILITY_THRESHOLD = 20;
+// Tiempo para capturar = 1.5 segundos estable
+const STABILITY_TIME_MS = 1500;
+const BRIGHTNESS_MIN = 40;
+const SAMPLE_SIZE = 80;
 
 const playShutterSound = () => {
   try {
