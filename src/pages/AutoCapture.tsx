@@ -66,64 +66,24 @@ const playShutterSound = () => {
   }
 };
 
-type CaptureStage = 'instructions' | 'capturing' | 'validating' | 'rejected';
+type CaptureStage = 'instructions' | 'capturing';
 
-// Umbrales de calidad de imagen (más permisivos para condiciones reales)
-const QUALITY_BRIGHTNESS_MIN = 25;  // Permite imágenes más oscuras
-const QUALITY_BRIGHTNESS_MAX = 250; // Permite imágenes más brillantes
-const QUALITY_CONTRAST_MIN = 20;    // Menos exigente con el contraste
+// Umbrales de calidad de imagen (permisivos para análisis orientativo)
+const QUALITY_BRIGHTNESS_MIN = 25;
+const QUALITY_BRIGHTNESS_MAX = 250;
+const QUALITY_CONTRAST_MIN = 20;
 
 interface ImageQualityResult {
   isValid: boolean;
   brightness: number;
   contrast: number;
-  issues: string[];
 }
 
-const validateImageQuality = (canvas: HTMLCanvasElement): ImageQualityResult => {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return { isValid: false, brightness: 0, contrast: 0, issues: ['No se pudo analizar la imagen'] };
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-
-  // Calculate brightness and contrast
-  let totalBrightness = 0;
-  let minBrightness = 255;
-  let maxBrightness = 0;
-  const sampleSize = Math.floor(data.length / 4 / 100);
-
-  for (let i = 0; i < data.length; i += sampleSize * 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    const brightness = (r + g + b) / 3;
-    totalBrightness += brightness;
-    minBrightness = Math.min(minBrightness, brightness);
-    maxBrightness = Math.max(maxBrightness, brightness);
-  }
-
-  const avgBrightness = totalBrightness / (data.length / 4 / sampleSize);
-  const contrast = maxBrightness - minBrightness;
-
-  const issues: string[] = [];
-
-  if (avgBrightness < QUALITY_BRIGHTNESS_MIN) {
-    issues.push('La imagen está muy oscura');
-  } else if (avgBrightness > QUALITY_BRIGHTNESS_MAX) {
-    issues.push('La imagen está muy brillante');
-  }
-
-  if (contrast < QUALITY_CONTRAST_MIN) {
-    issues.push('La imagen tiene poco contraste');
-  }
-
-  return {
-    isValid: issues.length === 0,
-    brightness: avgBrightness,
-    contrast,
-    issues
-  };
+// Validación rápida de calidad en tiempo real (usa datos ya calculados del frame)
+const checkQualityFromFrameData = (brightness: number, contrast: number): boolean => {
+  return brightness >= QUALITY_BRIGHTNESS_MIN && 
+         brightness <= QUALITY_BRIGHTNESS_MAX && 
+         contrast >= QUALITY_CONTRAST_MIN;
 };
 
 const AutoCapture = () => {
@@ -150,8 +110,7 @@ const AutoCapture = () => {
   const [showCaptureSuccess, setShowCaptureSuccess] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
-  const [currentCapturedImage, setCurrentCapturedImage] = useState<string | null>(null);
-  const [qualityIssues, setQualityIssues] = useState<string[]>([]);
+  const [isQualityOk, setIsQualityOk] = useState(false);
 
   const currentView = VIEW_ORDER[currentViewIndex];
   const isLastView = currentViewIndex === VIEW_ORDER.length - 1;
@@ -235,94 +194,46 @@ const AutoCapture = () => {
     }
   };
 
-  const resetForRetake = () => {
-    hasCapturedRef.current = false;
-    stableStartRef.current = null;
-    prevFrameRef.current = null;
-    setStabilityProgress(0);
-    setIsCapturing(false);
-    setShowCaptureSuccess(false);
-    setStatusText('Coloca los dientes en el recuadro');
-    setCurrentCapturedImage(null);
-    setStage('capturing');
-  };
-
-  const approvePhoto = () => {
-    if (isLastView) {
-      stopCamera();
-      stopAudio();
-      navigate('/revisar-fotos');
-    } else {
-      // Move to next view instructions
-      setCurrentViewIndex(prev => prev + 1);
-      hasCapturedRef.current = false;
-      stableStartRef.current = null;
-      prevFrameRef.current = null;
-      setStabilityProgress(0);
-      setIsCapturing(false);
-      setShowCaptureSuccess(false);
-      setStatusText('Coloca los dientes en el recuadro');
-      setCurrentCapturedImage(null);
-      setStage('instructions');
-    }
-  };
-
   const captureImage = () => {
     if (!canvasRef.current) return;
     
     hasCapturedRef.current = true;
     setIsCapturing(true);
-    setStatusText('¡Capturado! Validando...');
     playShutterSound();
 
     const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.9);
     const base64 = dataUrl.split(',')[1];
     
-    setCurrentCapturedImage(dataUrl);
-    setShowCaptureSuccess(true);
-    setStage('validating');
-
-    // Validate image quality immediately (fast validation)
-    const qualityResult = validateImageQuality(canvasRef.current);
+    // La calidad ya fue validada en tiempo real - guardar directamente
+    const capturedImage: CapturedImage = {
+      view: currentView,
+      imageUrl: dataUrl,
+      imageBase64: base64,
+    };
     
-    if (qualityResult.isValid) {
-      // Image is good - auto-approve immediately
-      const capturedImage: CapturedImage = {
-        view: currentView,
-        imageUrl: dataUrl,
-        imageBase64: base64,
-      };
-      
-      addCapturedImage(capturedImage);
-      setStatusText('✅ ¡Imagen aprobada!');
-      
-      // Auto-advance after brief success display
-      setTimeout(() => {
-        if (isLastView) {
-          stopCamera();
-          stopAudio();
-          navigate('/revisar-fotos');
-        } else {
-          // Move to next view instructions
-          setCurrentViewIndex(prev => prev + 1);
-          hasCapturedRef.current = false;
-          stableStartRef.current = null;
-          prevFrameRef.current = null;
-          setStabilityProgress(0);
-          setIsCapturing(false);
-          setShowCaptureSuccess(false);
-          setStatusText('Coloca los dientes en el recuadro');
-          setCurrentCapturedImage(null);
-          setQualityIssues([]);
-          setStage('instructions');
-        }
-      }, 800);
-    } else {
-      // Image quality not sufficient - show rejection and ask for retake
-      setQualityIssues(qualityResult.issues);
-      setShowCaptureSuccess(false);
-      setStage('rejected');
-    }
+    addCapturedImage(capturedImage);
+    setShowCaptureSuccess(true);
+    setStatusText('✅ ¡Capturado!');
+    
+    // Auto-advance después de mostrar éxito brevemente
+    setTimeout(() => {
+      if (isLastView) {
+        stopCamera();
+        stopAudio();
+        navigate('/revisar-fotos');
+      } else {
+        setCurrentViewIndex(prev => prev + 1);
+        hasCapturedRef.current = false;
+        stableStartRef.current = null;
+        prevFrameRef.current = null;
+        setStabilityProgress(0);
+        setIsCapturing(false);
+        setShowCaptureSuccess(false);
+        setIsQualityOk(false);
+        setStatusText('Coloca los dientes en el recuadro');
+        setStage('instructions');
+      }
+    }, 600);
   };
 
   // Start camera when entering capture stage
@@ -401,18 +312,30 @@ const AutoCapture = () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
       const currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      
-      let totalBrightness = 0;
       const step = Math.floor(currentFrame.data.length / 4 / SAMPLE_SIZE);
+      
+      // Calcular brillo y contraste en una sola pasada (rápido)
+      let totalBrightness = 0;
+      let minBrightness = 255;
+      let maxBrightness = 0;
+      
       for (let i = 0; i < currentFrame.data.length; i += step * 4) {
         const r = currentFrame.data[i];
         const g = currentFrame.data[i + 1];
         const b = currentFrame.data[i + 2];
-        totalBrightness += (r + g + b) / 3;
+        const brightness = (r + g + b) / 3;
+        totalBrightness += brightness;
+        minBrightness = Math.min(minBrightness, brightness);
+        maxBrightness = Math.max(maxBrightness, brightness);
       }
+      
       const avgBrightness = totalBrightness / SAMPLE_SIZE;
+      const contrast = maxBrightness - minBrightness;
       const lightOk = avgBrightness >= BRIGHTNESS_MIN;
+      const qualityOk = checkQualityFromFrameData(avgBrightness, contrast);
+      
       setIsLightAdequate(lightOk);
+      setIsQualityOk(qualityOk);
 
       let stability = 0;
       if (prevFrameRef.current) {
@@ -426,7 +349,8 @@ const AutoCapture = () => {
         }
         const avgDiff = totalDiff / SAMPLE_SIZE;
         
-        if (avgDiff < STABILITY_THRESHOLD) {
+        // Solo contar estabilidad si la calidad es aceptable
+        if (avgDiff < STABILITY_THRESHOLD && qualityOk) {
           if (!stableStartRef.current) {
             stableStartRef.current = Date.now();
           }
@@ -444,14 +368,25 @@ const AutoCapture = () => {
         } else {
           stableStartRef.current = null;
           stability = 0;
-          setStatusText('📷 Ajusta la posición...');
+          if (!qualityOk) {
+            if (avgBrightness < QUALITY_BRIGHTNESS_MIN) {
+              setStatusText('💡 Busca más luz...');
+            } else if (avgBrightness > QUALITY_BRIGHTNESS_MAX) {
+              setStatusText('🔆 Demasiada luz...');
+            } else {
+              setStatusText('📷 Ajusta la posición...');
+            }
+          } else {
+            setStatusText('📷 Mantén estable...');
+          }
         }
       }
       
       setStabilityProgress(stability);
       prevFrameRef.current = currentFrame;
 
-      if (stability >= 100 && lightOk && !hasCapturedRef.current) {
+      // Capturar solo cuando estabilidad completa Y calidad OK
+      if (stability >= 100 && qualityOk && !hasCapturedRef.current) {
         captureImage();
         return;
       }
@@ -588,91 +523,6 @@ const AutoCapture = () => {
           <Button className="w-full gap-2" size="lg" onClick={startCapture}>
             <Camera className="w-5 h-5" />
             Comenzar captura
-          </Button>
-          <Button variant="outline" className="w-full" onClick={handleCancel}>
-            Cancelar
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // VALIDATING STAGE - show brief validation animation
-  if (stage === 'validating' && currentCapturedImage) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
-        <div className="text-center space-y-6 px-6">
-          <div className="w-48 h-48 mx-auto rounded-2xl overflow-hidden border-4 border-primary bg-black animate-pulse">
-            <img 
-              src={currentCapturedImage} 
-              alt="Validando..."
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="space-y-2">
-            <div className="w-8 h-8 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-lg font-medium text-foreground">Validando calidad...</p>
-            <p className="text-sm text-muted-foreground">Verificando que la imagen sea apta para el análisis</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // REJECTED STAGE - image quality not sufficient
-  if (stage === 'rejected' && currentCapturedImage) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        {/* Header */}
-        <div className="p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleCancel}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-lg font-semibold text-foreground">Repetir foto</h1>
-          </div>
-        </div>
-
-        {/* Photo preview with rejection */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
-          <div className="w-full max-w-sm space-y-6">
-            <div className="aspect-[4/3] rounded-2xl overflow-hidden border-4 border-destructive bg-black relative">
-              <img 
-                src={currentCapturedImage} 
-                alt={`Vista ${viewLabels[currentView]} - requiere retomar`}
-                className="w-full h-full object-cover opacity-70"
-              />
-              <div className="absolute inset-0 bg-destructive/20 flex items-center justify-center">
-                <div className="bg-destructive text-destructive-foreground rounded-full p-3">
-                  <RotateCcw className="w-8 h-8" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="text-center space-y-3">
-              <h2 className="text-lg font-semibold text-foreground">
-                La imagen no es óptima
-              </h2>
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-                <p className="text-sm text-destructive font-medium mb-2">Problemas detectados:</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  {qualityIssues.map((issue, index) => (
-                    <li key={index}>• {issue}</li>
-                  ))}
-                </ul>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Por favor, busca mejor iluminación y vuelve a tomar la foto.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom action */}
-        <div className="p-4 space-y-3 bg-card border-t">
-          <Button className="w-full gap-2" size="lg" onClick={resetForRetake}>
-            <RotateCcw className="w-5 h-5" />
-            Volver a tomar foto
           </Button>
           <Button variant="outline" className="w-full" onClick={handleCancel}>
             Cancelar
