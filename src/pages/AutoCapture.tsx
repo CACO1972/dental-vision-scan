@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useImage, ViewType, CapturedImage } from '@/context/ImageContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Camera, Sun, SunDim, Check, Play, RotateCcw, ArrowRight, CircleCheck, CircleX, Contrast, Focus } from 'lucide-react';
+import { ArrowLeft, Camera, Sun, SunDim, Check, Play, RotateCcw, ArrowRight, CircleCheck, CircleX, Contrast, Focus, Loader2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -66,7 +66,7 @@ const playShutterSound = () => {
   }
 };
 
-type CaptureStage = 'instructions' | 'capturing';
+type CaptureStage = 'instructions' | 'capturing' | 'validating';
 
 // Umbrales de calidad de imagen (permisivos para análisis orientativo)
 const QUALITY_BRIGHTNESS_MIN = 25;
@@ -116,6 +116,10 @@ const AutoCapture = () => {
   const [currentBrightness, setCurrentBrightness] = useState(0);
   const [currentContrast, setCurrentContrast] = useState(0);
   const [currentSharpness, setCurrentSharpness] = useState(0);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [validationSuggestion, setValidationSuggestion] = useState<string | null>(null);
+  const [pendingImage, setPendingImage] = useState<{ dataUrl: string; base64: string } | null>(null);
 
   const currentView = VIEW_ORDER[currentViewIndex];
   const isLastView = currentViewIndex === VIEW_ORDER.length - 1;
@@ -199,7 +203,7 @@ const AutoCapture = () => {
     }
   };
 
-  const captureImage = () => {
+  const captureImage = async () => {
     if (!canvasRef.current) return;
     
     hasCapturedRef.current = true;
@@ -209,36 +213,104 @@ const AutoCapture = () => {
     const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.9);
     const base64 = dataUrl.split(',')[1];
     
-    // La calidad ya fue validada en tiempo real - guardar directamente
-    const capturedImage: CapturedImage = {
-      view: currentView,
-      imageUrl: dataUrl,
-      imageBase64: base64,
-    };
+    // Guardar imagen pendiente y pasar a validación
+    setPendingImage({ dataUrl, base64 });
+    setStage('validating');
+    setIsValidating(true);
+    setValidationError(null);
+    setValidationSuggestion(null);
+    setStatusText('🔍 Verificando dientes visibles...');
     
-    addCapturedImage(capturedImage);
-    setShowCaptureSuccess(true);
-    setStatusText('✅ ¡Capturado!');
-    
-    // Auto-advance después de mostrar éxito brevemente
-    setTimeout(() => {
-      if (isLastView) {
-        stopCamera();
-        stopAudio();
-        navigate('/revisar-fotos');
+    try {
+      const { data, error } = await supabase.functions.invoke('validate-dental-view', {
+        body: { imageBase64: base64, viewType: currentView }
+      });
+      
+      if (error) throw error;
+      
+      if (data.esValida) {
+        // Imagen válida - guardar y continuar
+        const capturedImage: CapturedImage = {
+          view: currentView,
+          imageUrl: dataUrl,
+          imageBase64: base64,
+        };
+        
+        addCapturedImage(capturedImage);
+        setShowCaptureSuccess(true);
+        setStatusText(`✅ ¡Perfecto! ${data.dientesVisibles || ''} dientes detectados`);
+        
+        setTimeout(() => {
+          if (isLastView) {
+            stopCamera();
+            stopAudio();
+            navigate('/revisar-fotos');
+          } else {
+            advanceToNextView();
+          }
+        }, 1200);
       } else {
-        setCurrentViewIndex(prev => prev + 1);
-        hasCapturedRef.current = false;
-        stableStartRef.current = null;
-        prevFrameRef.current = null;
-        setStabilityProgress(0);
-        setIsCapturing(false);
-        setShowCaptureSuccess(false);
-        setIsQualityOk(false);
-        setStatusText('Coloca los dientes en el recuadro');
-        setStage('instructions');
+        // Imagen no válida - mostrar error y permitir reintentar
+        setValidationError(data.mensaje || 'No se detectaron suficientes dientes');
+        setValidationSuggestion(data.sugerencia || 'Intenta abrir más la boca y mostrar más dientes');
+        setStatusText('❌ Imagen no válida');
       }
-    }, 600);
+    } catch (err) {
+      console.error('Validation error:', err);
+      // En caso de error de validación, aceptar la imagen (fail-open)
+      const capturedImage: CapturedImage = {
+        view: currentView,
+        imageUrl: dataUrl,
+        imageBase64: base64,
+      };
+      addCapturedImage(capturedImage);
+      setShowCaptureSuccess(true);
+      setStatusText('✅ ¡Capturado!');
+      
+      setTimeout(() => {
+        if (isLastView) {
+          stopCamera();
+          stopAudio();
+          navigate('/revisar-fotos');
+        } else {
+          advanceToNextView();
+        }
+      }, 800);
+    } finally {
+      setIsValidating(false);
+      setIsCapturing(false);
+    }
+  };
+  
+  const advanceToNextView = () => {
+    setCurrentViewIndex(prev => prev + 1);
+    hasCapturedRef.current = false;
+    stableStartRef.current = null;
+    prevFrameRef.current = null;
+    setStabilityProgress(0);
+    setIsCapturing(false);
+    setShowCaptureSuccess(false);
+    setIsQualityOk(false);
+    setPendingImage(null);
+    setValidationError(null);
+    setValidationSuggestion(null);
+    setStatusText('Coloca los dientes en el recuadro');
+    setStage('instructions');
+  };
+  
+  const retryCapture = () => {
+    hasCapturedRef.current = false;
+    stableStartRef.current = null;
+    prevFrameRef.current = null;
+    setStabilityProgress(0);
+    setIsCapturing(false);
+    setShowCaptureSuccess(false);
+    setIsQualityOk(false);
+    setPendingImage(null);
+    setValidationError(null);
+    setValidationSuggestion(null);
+    setStatusText('Coloca los dientes en el recuadro');
+    setStage('capturing');
   };
 
   // Start camera when entering capture stage
@@ -762,6 +834,89 @@ const AutoCapture = () => {
       </div>
     </div>
   );
+  
+  // VALIDATION STAGE - mostrar imagen capturada y resultado de validación
+  if (stage === 'validating') {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        {/* Header */}
+        <div className="p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={handleCancel}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-lg font-semibold text-foreground">
+              Verificando vista {viewLabels[currentView]}
+            </h1>
+          </div>
+        </div>
+        
+        {/* Imagen capturada */}
+        <div className="flex-1 flex flex-col items-center justify-center p-4 space-y-6">
+          {pendingImage && (
+            <div className="relative w-full max-w-md aspect-[4/3] rounded-xl overflow-hidden border-4 border-muted">
+              <img 
+                src={pendingImage.dataUrl} 
+                alt="Imagen capturada"
+                className="w-full h-full object-cover"
+              />
+              {isValidating && (
+                <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                  <div className="text-center space-y-3">
+                    <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
+                    <p className="text-foreground font-medium">Analizando dientes visibles...</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Resultado de validación */}
+          {!isValidating && validationError && (
+            <div className="w-full max-w-md space-y-4">
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-destructive">{validationError}</p>
+                    {validationSuggestion && (
+                      <p className="text-sm text-muted-foreground mt-1">{validationSuggestion}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={handleCancel}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  className="flex-1"
+                  onClick={retryCapture}
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Repetir foto
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {!isValidating && showCaptureSuccess && (
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto">
+                <Check className="w-6 h-6 text-white" />
+              </div>
+              <p className="text-green-600 font-medium">{statusText}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 };
 
 export default AutoCapture;

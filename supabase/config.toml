@@ -2,3 +2,6 @@ project_id = "tqidweeyjqimxljutgut"
 
 [functions.analyze-dental]
 verify_jwt = false
+
+[functions.validate-dental-view]
+verify_jwt = false
