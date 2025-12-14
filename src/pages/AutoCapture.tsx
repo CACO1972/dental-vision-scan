@@ -68,10 +68,10 @@ const playShutterSound = () => {
 
 type CaptureStage = 'instructions' | 'capturing' | 'validating' | 'rejected';
 
-// Umbrales de calidad de imagen
-const QUALITY_BRIGHTNESS_MIN = 40;
-const QUALITY_BRIGHTNESS_MAX = 240;
-const QUALITY_CONTRAST_MIN = 30;
+// Umbrales de calidad de imagen (más permisivos para condiciones reales)
+const QUALITY_BRIGHTNESS_MIN = 25;  // Permite imágenes más oscuras
+const QUALITY_BRIGHTNESS_MAX = 250; // Permite imágenes más brillantes
+const QUALITY_CONTRAST_MIN = 20;    // Menos exigente con el contraste
 
 interface ImageQualityResult {
   isValid: boolean;
@@ -282,51 +282,47 @@ const AutoCapture = () => {
     setShowCaptureSuccess(true);
     setStage('validating');
 
-    // Validate image quality
-    setTimeout(() => {
-      if (!canvasRef.current) return;
+    // Validate image quality immediately (fast validation)
+    const qualityResult = validateImageQuality(canvasRef.current);
+    
+    if (qualityResult.isValid) {
+      // Image is good - auto-approve immediately
+      const capturedImage: CapturedImage = {
+        view: currentView,
+        imageUrl: dataUrl,
+        imageBase64: base64,
+      };
       
-      const qualityResult = validateImageQuality(canvasRef.current);
+      addCapturedImage(capturedImage);
+      setStatusText('✅ ¡Imagen aprobada!');
       
-      if (qualityResult.isValid) {
-        // Image is good - auto-approve
-        const capturedImage: CapturedImage = {
-          view: currentView,
-          imageUrl: dataUrl,
-          imageBase64: base64,
-        };
-        
-        addCapturedImage(capturedImage);
-        setStatusText('✅ ¡Imagen aprobada!');
-        
-        // Auto-advance after brief success display
-        setTimeout(() => {
-          if (isLastView) {
-            stopCamera();
-            stopAudio();
-            navigate('/revisar-fotos');
-          } else {
-            // Move to next view instructions
-            setCurrentViewIndex(prev => prev + 1);
-            hasCapturedRef.current = false;
-            stableStartRef.current = null;
-            prevFrameRef.current = null;
-            setStabilityProgress(0);
-            setIsCapturing(false);
-            setShowCaptureSuccess(false);
-            setStatusText('Coloca los dientes en el recuadro');
-            setCurrentCapturedImage(null);
-            setQualityIssues([]);
-            setStage('instructions');
-          }
-        }, 1200);
-      } else {
-        // Image quality not sufficient - show rejection and ask for retake
-        setQualityIssues(qualityResult.issues);
-        setShowCaptureSuccess(false);
-        setStage('rejected');
-      }
-    }, 600);
+      // Auto-advance after brief success display
+      setTimeout(() => {
+        if (isLastView) {
+          stopCamera();
+          stopAudio();
+          navigate('/revisar-fotos');
+        } else {
+          // Move to next view instructions
+          setCurrentViewIndex(prev => prev + 1);
+          hasCapturedRef.current = false;
+          stableStartRef.current = null;
+          prevFrameRef.current = null;
+          setStabilityProgress(0);
+          setIsCapturing(false);
+          setShowCaptureSuccess(false);
+          setStatusText('Coloca los dientes en el recuadro');
+          setCurrentCapturedImage(null);
+          setQualityIssues([]);
+          setStage('instructions');
+        }
+      }, 800);
+    } else {
+      // Image quality not sufficient - show rejection and ask for retake
+      setQualityIssues(qualityResult.issues);
+      setShowCaptureSuccess(false);
+      setStage('rejected');
+    }
   };
 
   // Start camera when entering capture stage
