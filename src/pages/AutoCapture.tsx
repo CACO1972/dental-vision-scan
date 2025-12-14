@@ -66,7 +66,65 @@ const playShutterSound = () => {
   }
 };
 
-type CaptureStage = 'instructions' | 'capturing' | 'review';
+type CaptureStage = 'instructions' | 'capturing' | 'validating' | 'rejected';
+
+// Umbrales de calidad de imagen
+const QUALITY_BRIGHTNESS_MIN = 40;
+const QUALITY_BRIGHTNESS_MAX = 240;
+const QUALITY_CONTRAST_MIN = 30;
+
+interface ImageQualityResult {
+  isValid: boolean;
+  brightness: number;
+  contrast: number;
+  issues: string[];
+}
+
+const validateImageQuality = (canvas: HTMLCanvasElement): ImageQualityResult => {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return { isValid: false, brightness: 0, contrast: 0, issues: ['No se pudo analizar la imagen'] };
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  // Calculate brightness and contrast
+  let totalBrightness = 0;
+  let minBrightness = 255;
+  let maxBrightness = 0;
+  const sampleSize = Math.floor(data.length / 4 / 100);
+
+  for (let i = 0; i < data.length; i += sampleSize * 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const brightness = (r + g + b) / 3;
+    totalBrightness += brightness;
+    minBrightness = Math.min(minBrightness, brightness);
+    maxBrightness = Math.max(maxBrightness, brightness);
+  }
+
+  const avgBrightness = totalBrightness / (data.length / 4 / sampleSize);
+  const contrast = maxBrightness - minBrightness;
+
+  const issues: string[] = [];
+
+  if (avgBrightness < QUALITY_BRIGHTNESS_MIN) {
+    issues.push('La imagen está muy oscura');
+  } else if (avgBrightness > QUALITY_BRIGHTNESS_MAX) {
+    issues.push('La imagen está muy brillante');
+  }
+
+  if (contrast < QUALITY_CONTRAST_MIN) {
+    issues.push('La imagen tiene poco contraste');
+  }
+
+  return {
+    isValid: issues.length === 0,
+    brightness: avgBrightness,
+    contrast,
+    issues
+  };
+};
 
 const AutoCapture = () => {
   const navigate = useNavigate();
@@ -93,6 +151,7 @@ const AutoCapture = () => {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [currentCapturedImage, setCurrentCapturedImage] = useState<string | null>(null);
+  const [qualityIssues, setQualityIssues] = useState<string[]>([]);
 
   const currentView = VIEW_ORDER[currentViewIndex];
   const isLastView = currentViewIndex === VIEW_ORDER.length - 1;
@@ -213,27 +272,61 @@ const AutoCapture = () => {
     
     hasCapturedRef.current = true;
     setIsCapturing(true);
-    setStatusText('¡Capturado!');
+    setStatusText('¡Capturado! Validando...');
     playShutterSound();
 
     const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.9);
     const base64 = dataUrl.split(',')[1];
     
-    const capturedImage: CapturedImage = {
-      view: currentView,
-      imageUrl: dataUrl,
-      imageBase64: base64,
-    };
-    
-    addCapturedImage(capturedImage);
     setCurrentCapturedImage(dataUrl);
     setShowCaptureSuccess(true);
+    setStage('validating');
 
-    // Go to review stage after capture animation
+    // Validate image quality
     setTimeout(() => {
-      setStage('review');
-      setShowCaptureSuccess(false);
-    }, 800);
+      if (!canvasRef.current) return;
+      
+      const qualityResult = validateImageQuality(canvasRef.current);
+      
+      if (qualityResult.isValid) {
+        // Image is good - auto-approve
+        const capturedImage: CapturedImage = {
+          view: currentView,
+          imageUrl: dataUrl,
+          imageBase64: base64,
+        };
+        
+        addCapturedImage(capturedImage);
+        setStatusText('✅ ¡Imagen aprobada!');
+        
+        // Auto-advance after brief success display
+        setTimeout(() => {
+          if (isLastView) {
+            stopCamera();
+            stopAudio();
+            navigate('/revisar-fotos');
+          } else {
+            // Move to next view instructions
+            setCurrentViewIndex(prev => prev + 1);
+            hasCapturedRef.current = false;
+            stableStartRef.current = null;
+            prevFrameRef.current = null;
+            setStabilityProgress(0);
+            setIsCapturing(false);
+            setShowCaptureSuccess(false);
+            setStatusText('Coloca los dientes en el recuadro');
+            setCurrentCapturedImage(null);
+            setQualityIssues([]);
+            setStage('instructions');
+          }
+        }, 1200);
+      } else {
+        // Image quality not sufficient - show rejection and ask for retake
+        setQualityIssues(qualityResult.issues);
+        setShowCaptureSuccess(false);
+        setStage('rejected');
+      }
+    }, 600);
   };
 
   // Start camera when entering capture stage
@@ -508,8 +601,30 @@ const AutoCapture = () => {
     );
   }
 
-  // REVIEW STAGE
-  if (stage === 'review' && currentCapturedImage) {
+  // VALIDATING STAGE - show brief validation animation
+  if (stage === 'validating' && currentCapturedImage) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <div className="text-center space-y-6 px-6">
+          <div className="w-48 h-48 mx-auto rounded-2xl overflow-hidden border-4 border-primary bg-black animate-pulse">
+            <img 
+              src={currentCapturedImage} 
+              alt="Validando..."
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="w-8 h-8 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-lg font-medium text-foreground">Validando calidad...</p>
+            <p className="text-sm text-muted-foreground">Verificando que la imagen sea apta para el análisis</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // REJECTED STAGE - image quality not sufficient
+  if (stage === 'rejected' && currentCapturedImage) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         {/* Header */}
@@ -518,81 +633,53 @@ const AutoCapture = () => {
             <Button variant="ghost" size="icon" onClick={handleCancel}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-lg font-semibold text-foreground">Revisar foto</h1>
+            <h1 className="text-lg font-semibold text-foreground">Repetir foto</h1>
           </div>
         </div>
 
-        {/* Progress indicators */}
-        <div className="px-4 pb-4">
-          <div className="flex items-center justify-center gap-3">
-            {VIEW_ORDER.map((view, index) => {
-              const isCaptured = capturedImages.some(img => img.view === view);
-              const isCurrent = index === currentViewIndex;
-              
-              return (
-                <div key={view} className="flex items-center gap-2">
-                  <div className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center transition-all',
-                    isCaptured ? 'bg-green-500 text-white' :
-                    isCurrent ? 'bg-primary text-primary-foreground' :
-                    'bg-muted text-muted-foreground'
-                  )}>
-                    {isCaptured ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <span className="text-sm font-medium">{index + 1}</span>
-                    )}
-                  </div>
-                  <span className={cn(
-                    'text-sm font-medium hidden sm:inline',
-                    isCurrent ? 'text-foreground' : 'text-muted-foreground'
-                  )}>
-                    {viewLabels[view]}
-                  </span>
-                  {index < VIEW_ORDER.length - 1 && (
-                    <div className={cn(
-                      'w-8 h-0.5 rounded',
-                      isCaptured ? 'bg-green-500' : 'bg-muted'
-                    )} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Photo preview */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 py-4">
-          <div className="w-full max-w-sm space-y-4">
-            <div className="aspect-[4/3] rounded-2xl overflow-hidden border-4 border-green-500 bg-black">
+        {/* Photo preview with rejection */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
+          <div className="w-full max-w-sm space-y-6">
+            <div className="aspect-[4/3] rounded-2xl overflow-hidden border-4 border-destructive bg-black relative">
               <img 
                 src={currentCapturedImage} 
-                alt={`Vista ${viewLabels[currentView]} capturada`}
-                className="w-full h-full object-cover"
+                alt={`Vista ${viewLabels[currentView]} - requiere retomar`}
+                className="w-full h-full object-cover opacity-70"
               />
+              <div className="absolute inset-0 bg-destructive/20 flex items-center justify-center">
+                <div className="bg-destructive text-destructive-foreground rounded-full p-3">
+                  <RotateCcw className="w-8 h-8" />
+                </div>
+              </div>
             </div>
             
-            <div className="text-center">
+            <div className="text-center space-y-3">
               <h2 className="text-lg font-semibold text-foreground">
-                Vista {viewLabels[currentView]}
+                La imagen no es óptima
               </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                ¿La foto se ve bien?
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                <p className="text-sm text-destructive font-medium mb-2">Problemas detectados:</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  {qualityIssues.map((issue, index) => (
+                    <li key={index}>• {issue}</li>
+                  ))}
+                </ul>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Por favor, busca mejor iluminación y vuelve a tomar la foto.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Bottom actions */}
+        {/* Bottom action */}
         <div className="p-4 space-y-3 bg-card border-t">
-          <Button className="w-full gap-2" size="lg" onClick={approvePhoto}>
-            <Check className="w-5 h-5" />
-            {isLastView ? 'Aprobar y finalizar' : 'Aprobar y continuar'}
-            {!isLastView && <ArrowRight className="w-4 h-4" />}
+          <Button className="w-full gap-2" size="lg" onClick={resetForRetake}>
+            <RotateCcw className="w-5 h-5" />
+            Volver a tomar foto
           </Button>
-          <Button variant="outline" className="w-full gap-2" onClick={resetForRetake}>
-            <RotateCcw className="w-4 h-4" />
-            Volver a tomar
+          <Button variant="outline" className="w-full" onClick={handleCancel}>
+            Cancelar
           </Button>
         </div>
       </div>
