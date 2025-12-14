@@ -36,12 +36,13 @@ const viewVoiceTexts: Record<ViewType, string> = {
   inferior: 'Por último, la vista inferior. Mira hacia el piso, abre bien la boca y baja la lengua para mostrar tus dientes inferiores.',
 };
 
-// Umbral más alto = menos sensible al movimiento
-const STABILITY_THRESHOLD = 20;
-// Tiempo para capturar = 1.5 segundos estable
-const STABILITY_TIME_MS = 1500;
-const BRIGHTNESS_MIN = 40;
-const SAMPLE_SIZE = 80;
+// Umbral más alto = menos sensible al movimiento (más permisivo)
+const STABILITY_THRESHOLD = 30;
+// Tiempo para capturar = 1 segundo estable
+const STABILITY_TIME_MS = 1000;
+// Brillo mínimo más permisivo para capturar en más condiciones
+const BRIGHTNESS_MIN = 30;
+const SAMPLE_SIZE = 60;
 
 const playShutterSound = () => {
   try {
