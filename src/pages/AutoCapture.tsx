@@ -38,8 +38,8 @@ const viewVoiceTexts: Record<ViewType, string> = {
 
 // Umbral más alto = menos sensible al movimiento (más permisivo)
 const STABILITY_THRESHOLD = 30;
-// Tiempo para capturar = 3 segundos estable
-const STABILITY_TIME_MS = 3000;
+// Tiempo para capturar = 5 segundos estable
+const STABILITY_TIME_MS = 5000;
 // Brillo mínimo más permisivo para capturar en más condiciones
 const BRIGHTNESS_MIN = 30;
 const SAMPLE_SIZE = 60;
