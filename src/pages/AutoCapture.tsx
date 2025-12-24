@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useImage, ViewType, CapturedImage } from '@/context/ImageContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Camera, Sun, SunDim, Check, Play, RotateCcw, ArrowRight, CircleCheck, CircleX, Contrast, Focus, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Camera, Sun, SunDim, Check, Play, RotateCcw, ArrowRight, CircleCheck, CircleX, Contrast, Focus, Loader2, AlertTriangle, ImagePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -126,6 +126,8 @@ const AutoCapture = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [validationSuggestion, setValidationSuggestion] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<{ dataUrl: string; base64: string } | null>(null);
+  const [isUploadingFromGallery, setIsUploadingFromGallery] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentView = VIEW_ORDER[currentViewIndex];
   const isLastView = currentViewIndex === VIEW_ORDER.length - 1;
@@ -196,6 +198,106 @@ const AutoCapture = () => {
   const startCapture = () => {
     stopAudio();
     setStage('capturing');
+  };
+
+  const handleGalleryUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input for same file selection
+    e.target.value = '';
+
+    setIsUploadingFromGallery(true);
+    stopAudio();
+
+    try {
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.split(',')[1];
+
+        // Go to validation stage
+        setPendingImage({ dataUrl, base64 });
+        setStage('validating');
+        setIsValidating(true);
+        setValidationError(null);
+        setValidationSuggestion(null);
+        setStatusText('🔍 Verificando dientes visibles...');
+
+        try {
+          const { data, error } = await supabase.functions.invoke('validate-dental-view', {
+            body: { imageBase64: base64, viewType: currentView }
+          });
+
+          if (error) throw error;
+
+          if (data.esValida) {
+            const capturedImage: CapturedImage = {
+              view: currentView,
+              imageUrl: dataUrl,
+              imageBase64: base64,
+            };
+
+            addCapturedImage(capturedImage);
+            setShowCaptureSuccess(true);
+            setStatusText(`✅ ¡Perfecto! ${data.dientesVisibles || ''} dientes detectados`);
+
+            setTimeout(() => {
+              if (isLastView) {
+                stopCamera();
+                stopAudio();
+                navigate('/revisar-fotos');
+              } else {
+                advanceToNextView();
+              }
+            }, 1200);
+          } else {
+            setValidationError(data.mensaje || 'No se detectaron suficientes dientes');
+            setValidationSuggestion(data.sugerencia || 'Intenta con otra imagen que muestre más dientes');
+            setStatusText('❌ Imagen no válida');
+          }
+        } catch (err) {
+          console.error('Validation error:', err);
+          // Fail-open: accept image on error
+          const capturedImage: CapturedImage = {
+            view: currentView,
+            imageUrl: dataUrl,
+            imageBase64: base64,
+          };
+          addCapturedImage(capturedImage);
+          setShowCaptureSuccess(true);
+          setStatusText('✅ ¡Imagen aceptada!');
+
+          setTimeout(() => {
+            if (isLastView) {
+              stopCamera();
+              stopAudio();
+              navigate('/revisar-fotos');
+            } else {
+              advanceToNextView();
+            }
+          }, 800);
+        } finally {
+          setIsValidating(false);
+          setIsUploadingFromGallery(false);
+        }
+      };
+
+      reader.onerror = () => {
+        setIsUploadingFromGallery(false);
+        setValidationError('Error al leer la imagen');
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('File read error:', err);
+      setIsUploadingFromGallery(false);
+    }
   };
 
 
@@ -605,13 +707,31 @@ const AutoCapture = () => {
           </div>
         </div>
 
+        {/* Hidden file input for gallery upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+
         {/* Bottom action */}
         <div className="p-4 space-y-3 bg-card border-t">
           <Button className="w-full gap-2" size="lg" onClick={startCapture}>
             <Camera className="w-5 h-5" />
             Comenzar captura
           </Button>
-          <Button variant="outline" className="w-full" onClick={handleCancel}>
+          <Button 
+            variant="outline" 
+            className="w-full gap-2" 
+            onClick={handleGalleryUpload}
+            disabled={isUploadingFromGallery}
+          >
+            <ImagePlus className="w-5 h-5" />
+            {isUploadingFromGallery ? 'Cargando...' : 'Subir desde galería'}
+          </Button>
+          <Button variant="ghost" className="w-full text-muted-foreground" onClick={handleCancel}>
             Cancelar
           </Button>
         </div>
