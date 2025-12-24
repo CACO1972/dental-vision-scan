@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Smile, ArrowUp, ArrowDown, Camera, ChevronRight, Volume2, VolumeX, Users, RotateCcw } from 'lucide-react';
+import { Smile, ArrowUp, ArrowDown, Camera, ChevronRight, Volume2, VolumeX, Users, RotateCcw, ImagePlus } from 'lucide-react';
+import { useImage, ViewType, CapturedImage } from '@/context/ImageContext';
 import { supabase } from '@/integrations/supabase/client';
 
 import dentalFrontalView from '@/assets/dental-frontal-view.png';
@@ -44,12 +45,18 @@ Primero tomaremos una foto frontal sonriendo. Luego, para el maxilar superior, t
 
 La captura es automática, solo tienes que posicionarte correctamente y mantener la posición por unos segundos. ¡Busca un lugar con buena luz y comencemos!`;
 
+const VIEW_ORDER: ViewType[] = ['frontal', 'superior', 'inferior'];
+
 const IntroCaptura = () => {
   const navigate = useNavigate();
+  const { addCapturedImage, clearCapturedImages } = useImage();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeView, setActiveView] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [uploadingViewIndex, setUploadingViewIndex] = useState<number | null>(null);
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([null, null, null]);
+  const [uploadedViews, setUploadedViews] = useState<Set<ViewType>>(new Set());
 
   useEffect(() => {
     return () => {
@@ -106,6 +113,58 @@ const IntroCaptura = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleUploadClick = (index: number) => {
+    fileInputRefs.current[index]?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    e.target.value = '';
+    setUploadingViewIndex(index);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.split(',')[1];
+        const viewType = VIEW_ORDER[index];
+
+        const capturedImage: CapturedImage = {
+          view: viewType,
+          imageUrl: dataUrl,
+          imageBase64: base64,
+        };
+
+        addCapturedImage(capturedImage);
+        setUploadedViews(prev => new Set([...prev, viewType]));
+        setUploadingViewIndex(null);
+      };
+
+      reader.onerror = () => {
+        setUploadingViewIndex(null);
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('File read error:', err);
+      setUploadingViewIndex(null);
+    }
+  };
+
+  const allUploaded = uploadedViews.size === 3;
+
+  const handleContinueWithUploads = () => {
+    navigate('/revisar-fotos');
+  };
+
+  const handleStartCapture = () => {
+    clearCapturedImages();
+    setUploadedViews(new Set());
+    navigate('/auto-capture');
   };
 
   return (
@@ -213,6 +272,38 @@ const IntroCaptura = () => {
                       <p className="text-xs text-primary font-medium">{view.tip}</p>
                     </div>
                   )}
+
+                  {/* Upload from gallery button for each view */}
+                  <div className="mt-3">
+                    <input
+                      ref={el => fileInputRefs.current[index] = el}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileChange(e, index)}
+                    />
+                    <Button
+                      variant={uploadedViews.has(view.id as ViewType) ? "default" : "outline"}
+                      size="sm"
+                      className="w-full gap-2"
+                      onClick={() => handleUploadClick(index)}
+                      disabled={uploadingViewIndex === index}
+                    >
+                      {uploadedViews.has(view.id as ViewType) ? (
+                        <>
+                          <ImagePlus className="h-4 w-4" />
+                          ✓ Imagen cargada
+                        </>
+                      ) : uploadingViewIndex === index ? (
+                        'Cargando...'
+                      ) : (
+                        <>
+                          <ImagePlus className="h-4 w-4" />
+                          Subir desde galería
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -239,15 +330,35 @@ const IntroCaptura = () => {
           </ul>
         </div>
 
-        {/* Start button */}
-        <Button
-          onClick={() => navigate('/auto-capture')}
-          size="lg"
-          className="w-full mt-4 h-14 text-lg font-semibold"
-        >
-          Comenzar captura
-          <ChevronRight className="ml-2 h-5 w-5" />
-        </Button>
+        {/* Action buttons */}
+        <div className="mt-4 space-y-3">
+          {allUploaded ? (
+            <Button
+              onClick={handleContinueWithUploads}
+              size="lg"
+              className="w-full h-14 text-lg font-semibold"
+            >
+              Continuar con las imágenes
+              <ChevronRight className="ml-2 h-5 w-5" />
+            </Button>
+          ) : (
+            <Button
+              onClick={handleStartCapture}
+              size="lg"
+              className="w-full h-14 text-lg font-semibold"
+            >
+              <Camera className="mr-2 h-5 w-5" />
+              Captura automática
+              <ChevronRight className="ml-2 h-5 w-5" />
+            </Button>
+          )}
+          
+          {uploadedViews.size > 0 && !allUploaded && (
+            <p className="text-xs text-center text-muted-foreground">
+              {uploadedViews.size}/3 imágenes cargadas. Sube las 3 o usa captura automática.
+            </p>
+          )}
+        </div>
       </main>
     </div>
   );
