@@ -14,12 +14,12 @@ const viewRequirements: Record<ViewType, { description: string; minTeeth: number
     minTeeth: 4
   },
   superior: {
-    description: 'Vista oclusal superior: se deben ver las caras oclusales de al menos 10 dientes superiores, desde los incisivos hasta el primer molar de cada lado',
-    minTeeth: 10
+    description: 'Vista oclusal superior: se deben ver las caras oclusales de al menos 8 dientes superiores. Es aceptable si algunos dientes están parcialmente visibles.',
+    minTeeth: 8
   },
   inferior: {
-    description: 'Vista oclusal inferior: se deben ver las caras oclusales de al menos 10 dientes inferiores, desde los incisivos hasta el primer molar de cada lado',
-    minTeeth: 10
+    description: 'Vista oclusal inferior: se deben ver las caras oclusales de al menos 8 dientes inferiores. Es aceptable si algunos dientes están parcialmente visibles.',
+    minTeeth: 8
   }
 };
 
