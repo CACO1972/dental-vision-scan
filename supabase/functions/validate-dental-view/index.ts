@@ -10,8 +10,8 @@ type ViewType = 'frontal' | 'superior' | 'inferior';
 
 const viewRequirements: Record<ViewType, { description: string; minTeeth: number }> = {
   frontal: {
-    description: 'Vista frontal: se deben ver las caras vestibulares de los 6 dientes anteriores superiores (de canino a canino) y al menos parte de los 6 dientes anteriores inferiores',
-    minTeeth: 8
+    description: 'Vista frontal: se deben ver al menos parcialmente (50% o más) las caras vestibulares de algunos dientes anteriores superiores e inferiores. Es aceptable si se ven al menos 4-6 dientes en total entre superiores e inferiores, no es necesario ver todos perfectamente.',
+    minTeeth: 4
   },
   superior: {
     description: 'Vista oclusal superior: se deben ver las caras oclusales de al menos 10 dientes superiores, desde los incisivos hasta el primer molar de cada lado',
@@ -57,7 +57,7 @@ serve(async (req) => {
 
     console.log(`Validating ${viewType} view...`);
 
-    const systemPrompt = `Eres un asistente de validación de imágenes dentales. Tu único trabajo es verificar si una imagen dental cumple con requisitos específicos de visibilidad de dientes.
+    const systemPrompt = `Eres un asistente de validación de imágenes dentales. Tu trabajo es verificar si una imagen dental es aceptable para análisis.
 
 REQUISITO PARA ESTA IMAGEN:
 ${requirement.description}
@@ -65,16 +65,17 @@ ${requirement.description}
 Analiza la imagen y responde ÚNICAMENTE con un JSON válido (sin markdown, sin backticks):
 {
   "esValida": boolean,
-  "dientesVisibles": number (cantidad aproximada de dientes claramente visibles),
+  "dientesVisibles": number (cantidad aproximada de dientes visibles, incluyendo parcialmente visibles),
   "mensaje": "string explicando qué se ve y si cumple el requisito",
   "sugerencia": "string con sugerencia de cómo mejorar si no es válida (o null si es válida)"
 }
 
 CRITERIOS:
-- esValida = true solo si se ven claramente al menos ${requirement.minTeeth} dientes según el requisito
-- Sé estricto: los dientes deben verse claramente, no parcialmente ocultos
-- Si no es una imagen dental o está muy borrosa, esValida = false
-- El mensaje debe ser breve y claro para el paciente`;
+- esValida = true si se ven al menos ${requirement.minTeeth} dientes (pueden estar parcialmente visibles, no necesitan ser perfectamente claros)
+- Sé PERMISIVO: acepta imágenes donde los dientes sean identificables aunque no estén perfectamente enfocados o completamente visibles
+- Solo rechaza si realmente no se puede ver suficiente dentadura o la imagen es completamente borrosa/oscura
+- Si no es una imagen dental, esValida = false
+- El mensaje debe ser breve y alentador para el paciente`;
 
     const imageUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`;
 
