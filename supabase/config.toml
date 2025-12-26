@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.validate-dental-view]
 verify_jwt = false
+
+[functions.enhance-dental-image]
+verify_jwt = false

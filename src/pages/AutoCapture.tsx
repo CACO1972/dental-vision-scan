@@ -127,6 +127,7 @@ const AutoCapture = () => {
   const [validationSuggestion, setValidationSuggestion] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<{ dataUrl: string; base64: string } | null>(null);
   const [isUploadingFromGallery, setIsUploadingFromGallery] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentView = VIEW_ORDER[currentViewIndex];
@@ -237,10 +238,35 @@ const AutoCapture = () => {
           if (error) throw error;
 
           if (data.esValida) {
+            let finalDataUrl = dataUrl;
+            let finalBase64 = base64;
+            
+            // Para vistas oclusales, mejorar con IA
+            if (currentView === 'superior' || currentView === 'inferior') {
+              setIsEnhancing(true);
+              setStatusText('✨ Mejorando imagen con IA...');
+              
+              try {
+                const { data: enhanceData, error: enhanceError } = await supabase.functions.invoke('enhance-dental-image', {
+                  body: { imageBase64: base64, viewType: currentView }
+                });
+                
+                if (!enhanceError && enhanceData?.enhanced && enhanceData?.enhancedImage) {
+                  finalDataUrl = enhanceData.enhancedImage;
+                  finalBase64 = enhanceData.enhancedImage.split(',')[1] || enhanceData.enhancedImage;
+                  console.log('Image enhanced successfully');
+                }
+              } catch (enhanceErr) {
+                console.log('Enhancement failed, using original image:', enhanceErr);
+              } finally {
+                setIsEnhancing(false);
+              }
+            }
+            
             const capturedImage: CapturedImage = {
               view: currentView,
-              imageUrl: dataUrl,
-              imageBase64: base64,
+              imageUrl: finalDataUrl,
+              imageBase64: finalBase64,
             };
 
             addCapturedImage(capturedImage);
@@ -327,11 +353,36 @@ const AutoCapture = () => {
       if (error) throw error;
       
       if (data.esValida) {
+        let finalDataUrl = dataUrl;
+        let finalBase64 = base64;
+        
+        // Para vistas oclusales, mejorar con IA
+        if (currentView === 'superior' || currentView === 'inferior') {
+          setIsEnhancing(true);
+          setStatusText('✨ Mejorando imagen con IA...');
+          
+          try {
+            const { data: enhanceData, error: enhanceError } = await supabase.functions.invoke('enhance-dental-image', {
+              body: { imageBase64: base64, viewType: currentView }
+            });
+            
+            if (!enhanceError && enhanceData?.enhanced && enhanceData?.enhancedImage) {
+              finalDataUrl = enhanceData.enhancedImage;
+              finalBase64 = enhanceData.enhancedImage.split(',')[1] || enhanceData.enhancedImage;
+              console.log('Image enhanced successfully');
+            }
+          } catch (enhanceErr) {
+            console.log('Enhancement failed, using original image:', enhanceErr);
+          } finally {
+            setIsEnhancing(false);
+          }
+        }
+        
         // Imagen válida - guardar y continuar
         const capturedImage: CapturedImage = {
           view: currentView,
-          imageUrl: dataUrl,
-          imageBase64: base64,
+          imageUrl: finalDataUrl,
+          imageBase64: finalBase64,
         };
         
         addCapturedImage(capturedImage);
