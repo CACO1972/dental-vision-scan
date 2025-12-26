@@ -10,16 +10,16 @@ type ViewType = 'frontal' | 'superior' | 'inferior';
 
 const viewRequirements: Record<ViewType, { description: string; minTeeth: number }> = {
   frontal: {
-    description: 'Vista frontal: se deben ver al menos parcialmente (50% o más) las caras vestibulares de algunos dientes anteriores superiores e inferiores. Es aceptable si se ven al menos 4-6 dientes en total entre superiores e inferiores, no es necesario ver todos perfectamente.',
+    description: 'Vista frontal: se deben ver al menos parcialmente las caras vestibulares de algunos dientes anteriores. Aceptable con 4-6 dientes visibles.',
     minTeeth: 4
   },
   superior: {
-    description: 'Vista oclusal superior: se deben ver las caras oclusales de al menos 8 dientes superiores. Es aceptable si algunos dientes están parcialmente visibles.',
-    minTeeth: 8
+    description: 'Vista oclusal superior: cualquier porción visible de las superficies de masticación de dientes superiores. Puede ser parcial.',
+    minTeeth: 2
   },
   inferior: {
-    description: 'Vista oclusal inferior: se deben ver las caras oclusales de al menos 8 dientes inferiores. Es aceptable si algunos dientes están parcialmente visibles.',
-    minTeeth: 8
+    description: 'Vista oclusal inferior: cualquier porción visible de las superficies de masticación de dientes inferiores. Puede ser parcial.',
+    minTeeth: 2
   }
 };
 
@@ -57,25 +57,40 @@ serve(async (req) => {
 
     console.log(`Validating ${viewType} view...`);
 
-    const systemPrompt = `Eres un asistente de validación de imágenes dentales. Tu trabajo es verificar si una imagen dental es aceptable para análisis.
+    const isOcclusal = viewType === 'superior' || viewType === 'inferior';
+    
+    const systemPrompt = `Eres un asistente dental MUY PERMISIVO que valida fotos caseras de dientes.
 
-REQUISITO PARA ESTA IMAGEN:
+CONTEXTO IMPORTANTE:
+- Son fotos tomadas por la misma persona (selfies dentales)
+- Las vistas oclusales son MUY DIFÍCILES de capturar
+- Después se usará IA para mejorar y reconstruir las imágenes
+- Tu rol es ACEPTAR imágenes que tengan CUALQUIER utilidad
+
+REQUISITO MÍNIMO:
 ${requirement.description}
 
-Analiza la imagen y responde ÚNICAMENTE con un JSON válido (sin markdown, sin backticks):
+Responde ÚNICAMENTE con JSON válido (sin markdown):
 {
   "esValida": boolean,
-  "dientesVisibles": number (cantidad aproximada de dientes visibles, incluyendo parcialmente visibles),
-  "mensaje": "string explicando qué se ve y si cumple el requisito",
-  "sugerencia": "string con sugerencia de cómo mejorar si no es válida (o null si es válida)"
+  "dientesVisibles": number,
+  "mensaje": "string corto y amigable",
+  "sugerencia": "string o null"
 }
 
-CRITERIOS:
-- esValida = true si se ven al menos ${requirement.minTeeth} dientes (pueden estar parcialmente visibles, no necesitan ser perfectamente claros)
-- Sé PERMISIVO: acepta imágenes donde los dientes sean identificables aunque no estén perfectamente enfocados o completamente visibles
-- Solo rechaza si realmente no se puede ver suficiente dentadura o la imagen es completamente borrosa/oscura
-- Si no es una imagen dental, esValida = false
-- El mensaje debe ser breve y alentador para el paciente`;
+CRITERIOS ULTRA-PERMISIVOS:
+${isOcclusal ? `
+- Para vistas oclusales: ACEPTA si hay AL MENOS 1-2 dientes visibles desde arriba/abajo
+- ACEPTA aunque esté borrosa, oscura o parcial
+- ACEPTA aunque se vea solo una pequeña porción del arco dental
+- ACEPTA aunque la perspectiva no sea perfectamente perpendicular
+- Solo rechaza si NO hay NINGÚN diente visible o es foto de otra cosa
+` : `
+- ACEPTA si se ven algunos dientes frontales, aunque sean pocos
+- ACEPTA aunque esté parcialmente borrosa o con poca luz
+`}
+- El mensaje debe ser ALENTADOR y positivo
+- Si rechazas, da una sugerencia MUY SIMPLE`;
 
     const imageUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`;
 
