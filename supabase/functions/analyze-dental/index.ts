@@ -7,7 +7,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -22,35 +21,79 @@ serve(async (req) => {
       );
     }
 
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      console.error('OPENAI_API_KEY is not configured');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      console.error('LOVABLE_API_KEY is not configured');
       return new Response(
         JSON.stringify({ error: 'AI service not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Analyzing dental image with OpenAI GPT-4 Vision...');
+    console.log('Analyzing dental image with Gemini 2.5 Pro...');
 
-    const systemPrompt = `Eres un asistente de análisis dental para pacientes. Tu rol es analizar imágenes dentales y proporcionar observaciones orientativas.
+    const systemPrompt = `Eres un experto en análisis dental con formación en odontología clínica. Tu rol es realizar un análisis EXHAUSTIVO y DETALLADO de imágenes dentales para orientar al paciente.
 
-IMPORTANTE: 
-- NO eres un dentista ni proporcionas diagnósticos definitivos
-- Tus observaciones son ORIENTATIVAS y el paciente DEBE consultar con un profesional
-- Sé honesto si la imagen no es clara o no puedes ver bien ciertas áreas
-- Si no detectas problemas evidentes, dilo claramente
+INSTRUCCIONES DE ANÁLISIS PROFUNDO:
 
-Analiza la imagen y responde ÚNICAMENTE con un JSON válido (sin markdown, sin backticks) con esta estructura exacta:
+1. INSPECCIÓN VISUAL METICULOSA:
+   - Examina CADA diente visible individualmente
+   - Identifica cambios de coloración (manchas blancas, marrones, negras, grises)
+   - Busca líneas de fractura, chips, erosión del esmalte
+   - Detecta áreas de desmineralización (manchas blancas opacas)
+   - Observa la forma y contorno de cada diente
+
+2. ANÁLISIS DE ENCÍAS (TEJIDO GINGIVAL):
+   - Color: rosa saludable vs rojo inflamado vs pálido
+   - Textura: puntillado normal vs lisa inflamada
+   - Contorno: festoneado normal vs retraído vs inflamado
+   - Sangrado visible o signos de inflamación
+   - Recesión gingival (raíces expuestas)
+
+3. EVALUACIÓN DE CARIES:
+   - Caries incipientes (manchas blancas/marrones superficiales)
+   - Caries activas (cavitación visible)
+   - Caries interproximales (entre dientes)
+   - Caries radiculares (en raíces expuestas)
+   - Caries secundarias (alrededor de restauraciones)
+
+4. ANÁLISIS DE ACUMULACIÓN:
+   - Placa dental (película suave amarillenta)
+   - Cálculo/sarro supragingival (depósitos duros amarillentos/marrones)
+   - Manchas extrínsecas (té, café, tabaco)
+   - Distribución y severidad
+
+5. EVALUACIÓN DE RESTAURACIONES:
+   - Amalgamas, resinas, coronas visibles
+   - Integridad de márgenes
+   - Cambios de color alrededor
+   - Fracturas o defectos
+
+6. OTROS HALLAZGOS:
+   - Desgaste dental (atrición, abrasión, erosión)
+   - Maloclusión visible
+   - Espacios o apiñamiento
+   - Dientes ausentes
+   - Lesiones en mucosa oral visible
+
+IMPORTANTE:
+- Sé ESPECÍFICO con las ubicaciones (usa terminología: incisivo central/lateral, canino, premolares, molares; superior/inferior; derecho/izquierdo; vestibular/palatino/lingual/oclusal)
+- Indica nivel de confianza basado en la claridad de la imagen
+- Si algo no es claro, indícalo pero intenta hacer tu mejor evaluación
+- NO minimices hallazgos - es mejor alertar y que el dentista descarte que pasar algo por alto
+
+Responde ÚNICAMENTE con JSON válido (sin markdown, sin backticks):
 {
   "analisisValido": boolean,
-  "mensajeGeneral": "string describiendo lo que observas en general",
+  "mensajeGeneral": "Resumen ejecutivo del estado dental observado (2-3 oraciones)",
   "hallazgos": [
     {
-      "tipo": "caries" | "calculo" | "desgaste" | "gingivitis" | "otro",
+      "tipo": "caries" | "calculo" | "desgaste" | "gingivitis" | "placa" | "restauracion" | "fractura" | "manchas" | "recesion" | "otro",
       "confianza": "alta" | "media" | "baja",
-      "descripcion": "descripción específica de lo observado",
-      "ubicacion": "descripción de la ubicación aproximada",
+      "severidad": "leve" | "moderado" | "severo",
+      "descripcion": "Descripción detallada y específica del hallazgo",
+      "ubicacion": "Ubicación anatómica precisa",
+      "recomendacionEspecifica": "Qué debería hacer el paciente respecto a este hallazgo",
       "coordenadas": {
         "x": number entre 0 y 1,
         "y": number entre 0 y 1,
@@ -59,33 +102,26 @@ Analiza la imagen y responde ÚNICAMENTE con un JSON válido (sin markdown, sin 
       }
     }
   ],
-  "recomendacion": "string con recomendación general para el paciente",
+  "estadoGeneral": "bueno" | "aceptable" | "requiere_atencion" | "urgente",
+  "recomendacion": "Recomendación general priorizada para el paciente",
+  "proximosPasos": ["Lista de acciones recomendadas en orden de prioridad"],
   "calidadImagen": "buena" | "aceptable" | "mala",
-  "notaCalidadImagen": "string explicando si hay problemas con la imagen"
+  "notaCalidadImagen": "Explicación de limitaciones si las hay",
+  "areasNoVisibles": ["Lista de áreas que no se pudieron evaluar por la imagen"]
 }
 
-Si la imagen no muestra dientes o no es útil para análisis dental, responde:
-{
-  "analisisValido": false,
-  "mensajeGeneral": "explicación de por qué no se puede analizar",
-  "hallazgos": [],
-  "recomendacion": "Por favor sube una foto clara de tus dientes",
-  "calidadImagen": "mala",
-  "notaCalidadImagen": "explicación del problema"
-}
-
-Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y menciona que no se observan problemas evidentes en la imagen, pero que esto NO significa que no existan y debe consultar con un profesional.`;
+Si no hay problemas evidentes, indica que el estado VISIBLE parece saludable pero enfatiza la importancia de revisión profesional para áreas no visibles (interproximales, radiografías, etc.).`;
 
     const imageUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'google/gemini-2.5-pro',
         messages: [
           { role: 'system', content: systemPrompt },
           { 
@@ -93,7 +129,7 @@ Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y
             content: [
               {
                 type: 'text',
-                text: 'Analiza esta imagen dental y proporciona tus observaciones orientativas. Recuerda responder SOLO con JSON válido, sin markdown ni backticks.'
+                text: 'Realiza un análisis dental EXHAUSTIVO y DETALLADO de esta imagen. Examina cada diente visible, las encías, busca signos de caries, acumulación de sarro, inflamación gingival, desgaste, y cualquier otro hallazgo clínico relevante. Sé minucioso y específico. Responde SOLO con JSON válido.'
               },
               {
                 type: 'image_url',
@@ -105,13 +141,12 @@ Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y
             ]
           }
         ],
-        max_tokens: 2000,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenAI API error:', response.status, errorText);
+      console.error('Lovable AI Gateway error:', response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -119,10 +154,10 @@ Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      if (response.status === 401) {
+      if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: 'Error de autenticación con el servicio de IA.' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'Créditos de IA agotados. Contacta soporte.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
@@ -136,19 +171,17 @@ Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y
     const aiResponse = data.choices?.[0]?.message?.content;
 
     if (!aiResponse) {
-      console.error('No response from OpenAI');
+      console.error('No response from AI');
       return new Response(
         JSON.stringify({ error: 'No se recibió respuesta del análisis' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('OpenAI Response received:', aiResponse.substring(0, 200));
+    console.log('AI Response received:', aiResponse.substring(0, 500));
 
-    // Parse the JSON response from AI
     let analysisResult;
     try {
-      // Clean the response in case it has markdown formatting
       let cleanedResponse = aiResponse.trim();
       if (cleanedResponse.startsWith('```json')) {
         cleanedResponse = cleanedResponse.slice(7);
@@ -163,7 +196,7 @@ Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y
       
       analysisResult = JSON.parse(cleanedResponse);
     } catch (parseError) {
-      console.error('Failed to parse OpenAI response:', parseError);
+      console.error('Failed to parse AI response:', parseError);
       console.error('Raw response:', aiResponse);
       return new Response(
         JSON.stringify({ 
@@ -174,7 +207,8 @@ Si no detectas ningún problema evidente, devuelve hallazgos como array vacío y
       );
     }
 
-    console.log('Analysis complete:', JSON.stringify(analysisResult).substring(0, 300));
+    console.log('Analysis complete with', analysisResult.hallazgos?.length || 0, 'findings');
+    console.log('Estado general:', analysisResult.estadoGeneral);
 
     return new Response(
       JSON.stringify(analysisResult),
