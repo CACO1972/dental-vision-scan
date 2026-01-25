@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useImage, Hallazgo, ViewType } from '@/context/ImageContext';
-import { Scan, ArrowLeft, AlertCircle, CheckCircle2, AlertTriangle, ImageOff, Activity, ListChecks, EyeOff } from 'lucide-react';
+import { Scan, ArrowLeft, AlertCircle, CheckCircle2, AlertTriangle, ImageOff, Activity, ListChecks, EyeOff, Lock, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
+import PaymentUpgrade from '@/components/PaymentUpgrade';
+import { useToast } from '@/hooks/use-toast';
 const tipoConfig: Record<string, { color: string; colorClass: string; label: string }> = {
   caries: { color: '#ef4444', colorClass: 'bg-destructive', label: 'Posible caries' },
   calculo: { color: '#22c55e', colorClass: 'bg-success', label: 'Posible cálculo/sarro' },
@@ -45,8 +46,28 @@ const viewLabels: Record<ViewType, string> = {
 
 const Analisis = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
   const { selectedImageUrl, analysisResult, capturedImages } = useImage();
   const [selectedView, setSelectedView] = useState<ViewType | 'all'>('all');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isPremiumUnlocked, setIsPremiumUnlocked] = useState(false);
+
+  // Check for successful payment return
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment');
+    if (paymentStatus === 'success') {
+      const pendingPayment = localStorage.getItem('pendingPayment');
+      if (pendingPayment) {
+        setIsPremiumUnlocked(true);
+        localStorage.removeItem('pendingPayment');
+        toast({
+          title: '¡Pago exitoso!',
+          description: 'Tu informe completo ya está disponible.',
+        });
+      }
+    }
+  }, [searchParams, toast]);
 
   useEffect(() => {
     // Check if we have either single image or multiple captured images
@@ -253,7 +274,7 @@ const Analisis = () => {
               
               {filteredFindings.length > 0 ? (
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                  {filteredFindings.map((hallazgo: Hallazgo, index: number) => {
+                  {filteredFindings.slice(0, isPremiumUnlocked ? undefined : 2).map((hallazgo: Hallazgo, index: number) => {
                     const config = tipoConfig[hallazgo.tipo] || tipoConfig.otro;
                     const severidadCfg = hallazgo.severidad ? severidadConfig[hallazgo.severidad] : null;
                     return (
@@ -294,7 +315,7 @@ const Analisis = () => {
                                 📍 {hallazgo.ubicacion}
                               </p>
                             )}
-                            {hallazgo.recomendacionEspecifica && (
+                            {isPremiumUnlocked && hallazgo.recomendacionEspecifica && (
                               <p className="text-xs text-primary mt-2 bg-primary/5 rounded-lg p-2">
                                 💡 {hallazgo.recomendacionEspecifica}
                               </p>
@@ -304,6 +325,26 @@ const Analisis = () => {
                       </div>
                     );
                   })}
+                  
+                  {/* Premium locked content indicator */}
+                  {!isPremiumUnlocked && filteredFindings.length > 2 && (
+                    <div 
+                      className="bg-gradient-to-b from-card to-muted/50 rounded-xl p-6 border border-border text-center cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={() => setShowPaymentModal(true)}
+                    >
+                      <Lock className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+                      <h3 className="font-semibold text-foreground mb-1">
+                        +{filteredFindings.length - 2} hallazgos más
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Desbloquea el informe completo para ver todos los hallazgos y recomendaciones personalizadas
+                      </p>
+                      <Button variant="hero" size="sm" onClick={() => setShowPaymentModal(true)}>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Desbloquear por $4.990
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="bg-success/10 rounded-xl p-4 border border-success/20">
@@ -373,9 +414,33 @@ const Analisis = () => {
             </div>
           </div>
 
+          {/* Upsell CTA for free users */}
+          {!isPremiumUnlocked && hasFindings && (
+            <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 rounded-2xl p-6 border border-primary/20">
+              <div className="flex flex-col md:flex-row items-center gap-4">
+                <div className="flex-1 text-center md:text-left">
+                  <h3 className="font-bold text-lg text-foreground mb-1">
+                    ¿Quieres el informe completo?
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Incluye todos los hallazgos, recomendaciones personalizadas y simulación de sonrisa
+                  </p>
+                </div>
+                <Button 
+                  variant="hero" 
+                  size="lg"
+                  onClick={() => setShowPaymentModal(true)}
+                >
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Desbloquear por $4.990
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Action buttons */}
           <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
-            {hasFindings && (
+            {isPremiumUnlocked && hasFindings && (
               <Button 
                 variant="hero" 
                 size="lg"
@@ -394,6 +459,21 @@ const Analisis = () => {
           </div>
         </div>
       </main>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full animate-fade-in">
+            <PaymentUpgrade 
+              onClose={() => setShowPaymentModal(false)}
+              onSuccess={() => {
+                setIsPremiumUnlocked(true);
+                setShowPaymentModal(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

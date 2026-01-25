@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.enhance-dental-image]
 verify_jwt = false
+
+[functions.flow-payment]
+verify_jwt = false
+
+[functions.flow-payment-confirm]
+verify_jwt = false
