@@ -9,10 +9,12 @@ export interface CapturedImage {
 }
 
 export interface Hallazgo {
-  tipo: 'caries' | 'calculo' | 'desgaste' | 'gingivitis' | 'otro';
+  tipo: 'caries' | 'calculo' | 'desgaste' | 'gingivitis' | 'placa' | 'restauracion' | 'fractura' | 'manchas' | 'recesion' | 'otro';
   confianza: 'alta' | 'media' | 'baja';
+  severidad: 'leve' | 'moderado' | 'severo';
   descripcion: string;
   ubicacion: string;
+  recomendacionEspecifica?: string;
   vista?: ViewType;
   coordenadas: {
     x: number;
@@ -26,9 +28,12 @@ export interface AnalisisResultado {
   analisisValido: boolean;
   mensajeGeneral: string;
   hallazgos: Hallazgo[];
+  estadoGeneral: 'bueno' | 'aceptable' | 'requiere_atencion' | 'urgente';
   recomendacion: string;
+  proximosPasos: string[];
   calidadImagen: 'buena' | 'aceptable' | 'mala';
   notaCalidadImagen: string;
+  areasNoVisibles: string[];
 }
 
 interface ImageContextType {
