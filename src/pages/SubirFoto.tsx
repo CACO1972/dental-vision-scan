@@ -2,15 +2,13 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useImage } from '@/context/ImageContext';
-import { Scan, Upload, Camera, CheckCircle, ArrowLeft, X, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Scan, Upload, Camera, CheckCircle, ArrowLeft, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 const SubirFoto = () => {
   const navigate = useNavigate();
   const { selectedImageUrl, setSelectedImageUrl, selectedImageBase64, setSelectedImageBase64, setAnalysisResult } = useImage();
   const [isDragging, setIsDragging] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const convertToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -66,33 +64,9 @@ const SubirFoto = () => {
     setAnalysisResult(null);
   };
 
-  const handleAnalyze = async () => {
-    setIsAnalyzing(true);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('analyze-dental', {
-        body: { imageBase64: selectedImageBase64 }
-      });
-
-      if (error) {
-        console.error('Analysis error:', error);
-        toast.error('Error al analizar la imagen. Intenta de nuevo.');
-        return;
-      }
-
-      if (data.error) {
-        toast.error(data.error);
-        return;
-      }
-
-      setAnalysisResult(data);
-      navigate('/analisis');
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error de conexión. Verifica tu internet e intenta de nuevo.');
-    } finally {
-      setIsAnalyzing(false);
-    }
+  const handleAnalyze = () => {
+    if (!selectedImageBase64) return;
+    navigate('/analizando');
   };
 
   return (
@@ -148,12 +122,12 @@ const SubirFoto = () => {
                 variant="outline"
                 size="lg"
                 className="w-full py-6 border-primary/30 hover:border-primary hover:bg-primary/5"
-                onClick={() => navigate('/auto-capture')}
+                onClick={() => navigate('/intro-captura')}
               >
                 <Camera className="w-5 h-5 mr-3 text-primary" />
                 <div className="text-left">
-                  <span className="font-semibold text-foreground">Captura automática</span>
-                  <p className="text-xs text-muted-foreground">La app toma la foto cuando esté lista</p>
+                  <span className="font-semibold text-foreground">Captura guiada (3 vistas)</span>
+                  <p className="text-xs text-muted-foreground">Análisis más completo con múltiples ángulos</p>
                 </div>
               </Button>
 
@@ -182,7 +156,7 @@ const SubirFoto = () => {
                   </div>
                   <div>
                     <p className="font-semibold text-foreground">
-                      Subir desde galería
+                      Subir imagen única
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">
                       Arrastra o haz clic para seleccionar
@@ -198,8 +172,7 @@ const SubirFoto = () => {
             <div className="relative bg-card rounded-2xl border border-border overflow-hidden">
               <button
                 onClick={clearImage}
-                disabled={isAnalyzing}
-                className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-foreground/80 hover:bg-foreground flex items-center justify-center transition-colors disabled:opacity-50"
+                className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-foreground/80 hover:bg-foreground flex items-center justify-center transition-colors"
               >
                 <X className="w-4 h-4 text-background" />
               </button>
@@ -222,28 +195,15 @@ const SubirFoto = () => {
             variant="hero" 
             size="xl" 
             className="w-full"
-            disabled={!selectedImageUrl || isAnalyzing}
+            disabled={!selectedImageUrl}
             onClick={handleAnalyze}
           >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Analizando con IA...
-              </>
-            ) : (
-              'Analizar con inteligencia artificial'
-            )}
+            Analizar con inteligencia artificial
           </Button>
 
-          {selectedImageUrl && !isAnalyzing && (
+          {selectedImageUrl && (
             <p className="text-center text-sm text-muted-foreground">
               ¿Imagen incorrecta? Haz clic en la X para cambiarla
-            </p>
-          )}
-
-          {isAnalyzing && (
-            <p className="text-center text-sm text-muted-foreground animate-pulse">
-              Esto puede tomar unos segundos...
             </p>
           )}
         </div>
