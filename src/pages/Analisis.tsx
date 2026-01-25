@@ -5,6 +5,7 @@ import { useImage, Hallazgo, ViewType } from '@/context/ImageContext';
 import { Scan, ArrowLeft, AlertCircle, CheckCircle2, AlertTriangle, ImageOff, Activity, ListChecks, EyeOff, Lock, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import PaymentUpgrade from '@/components/PaymentUpgrade';
+import SmileSimulation from '@/components/SmileSimulation';
 import { useToast } from '@/hooks/use-toast';
 const tipoConfig: Record<string, { color: string; colorClass: string; label: string }> = {
   caries: { color: '#ef4444', colorClass: 'bg-destructive', label: 'Posible caries' },
@@ -48,7 +49,7 @@ const Analisis = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const { selectedImageUrl, analysisResult, capturedImages } = useImage();
+  const { selectedImageUrl, selectedImageBase64, analysisResult, capturedImages } = useImage();
   const [selectedView, setSelectedView] = useState<ViewType | 'all'>('all');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isPremiumUnlocked, setIsPremiumUnlocked] = useState(false);
@@ -414,7 +415,14 @@ const Analisis = () => {
             </div>
           </div>
 
-          {/* Upsell CTA for free users */}
+          {/* Smile Simulation - Premium Feature */}
+          {isPremiumUnlocked && hasFindings && (
+            <SmileSimulation 
+              imageBase64={capturedImages[0]?.imageBase64 || selectedImageBase64 || ''} 
+              hallazgos={analysisResult.hallazgos}
+            />
+          )}
+
           {!isPremiumUnlocked && hasFindings && (
             <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 rounded-2xl p-6 border border-primary/20">
               <div className="flex flex-col md:flex-row items-center gap-4">
