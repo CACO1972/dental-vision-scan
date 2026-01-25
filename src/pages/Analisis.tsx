@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useImage, Hallazgo, ViewType } from '@/context/ImageContext';
-import { Scan, ArrowLeft, AlertCircle, CheckCircle2, AlertTriangle, ImageOff } from 'lucide-react';
+import { Scan, ArrowLeft, AlertCircle, CheckCircle2, AlertTriangle, ImageOff, Activity, ListChecks, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const tipoConfig: Record<string, { color: string; colorClass: string; label: string }> = {
@@ -10,6 +10,11 @@ const tipoConfig: Record<string, { color: string; colorClass: string; label: str
   calculo: { color: '#22c55e', colorClass: 'bg-success', label: 'Posible cálculo/sarro' },
   desgaste: { color: '#f59e0b', colorClass: 'bg-warning', label: 'Desgaste dental' },
   gingivitis: { color: '#8b5cf6', colorClass: 'bg-purple-500', label: 'Posible gingivitis' },
+  placa: { color: '#eab308', colorClass: 'bg-yellow-500', label: 'Placa dental' },
+  restauracion: { color: '#3b82f6', colorClass: 'bg-blue-500', label: 'Restauración' },
+  fractura: { color: '#dc2626', colorClass: 'bg-red-600', label: 'Fractura' },
+  manchas: { color: '#a16207', colorClass: 'bg-amber-700', label: 'Manchas' },
+  recesion: { color: '#7c3aed', colorClass: 'bg-violet-600', label: 'Recesión gingival' },
   otro: { color: '#6b7280', colorClass: 'bg-gray-500', label: 'Observación' },
 };
 
@@ -17,6 +22,19 @@ const confianzaLabel: Record<string, string> = {
   alta: 'Alta confianza',
   media: 'Confianza media',
   baja: 'Baja confianza',
+};
+
+const severidadConfig: Record<string, { colorClass: string; label: string }> = {
+  leve: { colorClass: 'bg-success/20 text-success', label: 'Leve' },
+  moderado: { colorClass: 'bg-warning/20 text-warning', label: 'Moderado' },
+  severo: { colorClass: 'bg-destructive/20 text-destructive', label: 'Severo' },
+};
+
+const estadoGeneralConfig: Record<string, { icon: string; colorClass: string; bgClass: string; label: string }> = {
+  bueno: { icon: '✓', colorClass: 'text-success', bgClass: 'bg-success/10 border-success/20', label: 'Estado general bueno' },
+  aceptable: { icon: '○', colorClass: 'text-primary', bgClass: 'bg-primary/10 border-primary/20', label: 'Estado general aceptable' },
+  requiere_atencion: { icon: '!', colorClass: 'text-warning', bgClass: 'bg-warning/10 border-warning/20', label: 'Requiere atención' },
+  urgente: { icon: '⚠', colorClass: 'text-destructive', bgClass: 'bg-destructive/10 border-destructive/20', label: 'Atención urgente recomendada' },
 };
 
 const viewLabels: Record<ViewType, string> = {
@@ -195,8 +213,30 @@ const Analisis = () => {
               </div>
             </div>
 
-            {/* Detections list */}
+            {/* Detections and info list */}
             <div className="space-y-4">
+              {/* Estado General */}
+              {analysisResult.estadoGeneral && (
+                <div className={cn(
+                  'rounded-xl p-4 border flex items-center gap-3',
+                  estadoGeneralConfig[analysisResult.estadoGeneral]?.bgClass || 'bg-muted'
+                )}>
+                  <Activity className={cn(
+                    'w-6 h-6',
+                    estadoGeneralConfig[analysisResult.estadoGeneral]?.colorClass || 'text-foreground'
+                  )} />
+                  <div>
+                    <h3 className={cn(
+                      'font-semibold',
+                      estadoGeneralConfig[analysisResult.estadoGeneral]?.colorClass || 'text-foreground'
+                    )}>
+                      {estadoGeneralConfig[analysisResult.estadoGeneral]?.label || 'Estado general'}
+                    </h3>
+                  </div>
+                </div>
+              )}
+
+              {/* Hallazgos */}
               <h2 className="font-semibold text-foreground flex items-center gap-2">
                 {filteredFindings.length > 0 ? (
                   <>
@@ -215,6 +255,7 @@ const Analisis = () => {
                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
                   {filteredFindings.map((hallazgo: Hallazgo, index: number) => {
                     const config = tipoConfig[hallazgo.tipo] || tipoConfig.otro;
+                    const severidadCfg = hallazgo.severidad ? severidadConfig[hallazgo.severidad] : null;
                     return (
                       <div 
                         key={index}
@@ -225,7 +266,12 @@ const Analisis = () => {
                           <div className="flex-1">
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                               <h3 className="font-semibold text-foreground">{config.label}</h3>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {severidadCfg && (
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severidadCfg.colorClass}`}>
+                                    {severidadCfg.label}
+                                  </span>
+                                )}
                                 {hallazgo.vista && (
                                   <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                     {viewLabels[hallazgo.vista]}
@@ -248,6 +294,11 @@ const Analisis = () => {
                                 📍 {hallazgo.ubicacion}
                               </p>
                             )}
+                            {hallazgo.recomendacionEspecifica && (
+                              <p className="text-xs text-primary mt-2 bg-primary/5 rounded-lg p-2">
+                                💡 {hallazgo.recomendacionEspecifica}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -264,10 +315,48 @@ const Analisis = () => {
                 </div>
               )}
 
+              {/* Próximos Pasos */}
+              {analysisResult.proximosPasos && analysisResult.proximosPasos.length > 0 && (
+                <div className="bg-card rounded-xl p-4 border border-border">
+                  <h3 className="font-semibold text-sm text-foreground mb-3 flex items-center gap-2">
+                    <ListChecks className="w-4 h-4 text-primary" />
+                    Próximos pasos recomendados
+                  </h3>
+                  <ol className="space-y-2">
+                    {analysisResult.proximosPasos.map((paso, index) => (
+                      <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center shrink-0 mt-0.5 font-medium">
+                          {index + 1}
+                        </span>
+                        {paso}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {/* Áreas no visibles */}
+              {analysisResult.areasNoVisibles && analysisResult.areasNoVisibles.length > 0 && (
+                <div className="bg-muted/50 rounded-xl p-4 border border-border">
+                  <h3 className="font-semibold text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                    <EyeOff className="w-4 h-4" />
+                    Áreas no evaluadas
+                  </h3>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    {analysisResult.areasNoVisibles.map((area, index) => (
+                      <li key={index} className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
+                        {area}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* Recommendation */}
               {analysisResult.recomendacion && (
                 <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
-                  <h3 className="font-semibold text-sm text-primary mb-2">💡 Recomendación</h3>
+                  <h3 className="font-semibold text-sm text-primary mb-2">💡 Recomendación general</h3>
                   <p className="text-sm text-foreground">{analysisResult.recomendacion}</p>
                 </div>
               )}

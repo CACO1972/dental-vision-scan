@@ -43,6 +43,9 @@ const RevisarFotos = () => {
       let recommendation = '';
       let worstImageQuality: 'buena' | 'aceptable' | 'mala' = 'buena';
       let qualityNotes: string[] = [];
+      let estadoGeneral: 'bueno' | 'aceptable' | 'requiere_atencion' | 'urgente' = 'bueno';
+      let allProximosPasos: string[] = [];
+      let allAreasNoVisibles: string[] = [];
 
       for (const image of capturedImages) {
         const { data, error } = await supabase.functions.invoke('analyze-dental', {
@@ -77,6 +80,22 @@ const RevisarFotos = () => {
           recommendation = data.recomendacion;
         }
 
+        // Track worst estado general
+        const estadoPriority = { bueno: 0, aceptable: 1, requiere_atencion: 2, urgente: 3 };
+        if (data.estadoGeneral && estadoPriority[data.estadoGeneral as keyof typeof estadoPriority] > estadoPriority[estadoGeneral]) {
+          estadoGeneral = data.estadoGeneral;
+        }
+
+        // Collect proximos pasos
+        if (data.proximosPasos && Array.isArray(data.proximosPasos)) {
+          allProximosPasos.push(...data.proximosPasos);
+        }
+
+        // Collect areas no visibles
+        if (data.areasNoVisibles && Array.isArray(data.areasNoVisibles)) {
+          allAreasNoVisibles.push(...data.areasNoVisibles);
+        }
+
         // Track worst image quality
         if (data.calidadImagen === 'mala') {
           worstImageQuality = 'mala';
@@ -89,13 +108,20 @@ const RevisarFotos = () => {
         }
       }
 
+      // Remove duplicate proximos pasos and areas no visibles
+      const uniqueProximosPasos = [...new Set(allProximosPasos)];
+      const uniqueAreasNoVisibles = [...new Set(allAreasNoVisibles)];
+
       const combinedResult = {
         analisisValido: true,
         mensajeGeneral: generalMessage.trim() || 'Análisis completado de las 3 vistas dentales.',
         hallazgos: allHallazgos,
+        estadoGeneral,
         recomendacion: recommendation || 'Se recomienda consultar con un profesional dental para una evaluación completa.',
+        proximosPasos: uniqueProximosPasos,
         calidadImagen: worstImageQuality,
         notaCalidadImagen: qualityNotes.join(' ') || '',
+        areasNoVisibles: uniqueAreasNoVisibles,
       };
 
       setAnalysisResult(combinedResult);
