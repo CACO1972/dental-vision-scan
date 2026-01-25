@@ -240,11 +240,13 @@ const Analisis = () => {
               {/* Estado General */}
               {analysisResult.estadoGeneral && (
                 <div className={cn(
-                  'rounded-xl p-4 border flex items-center gap-3',
+                  'rounded-xl p-4 border flex items-center gap-3 opacity-0 animate-status-reveal',
                   estadoGeneralConfig[analysisResult.estadoGeneral]?.bgClass || 'bg-muted'
-                )}>
+                )}
+                style={{ animationFillMode: 'forwards' }}
+                >
                   <Activity className={cn(
-                    'w-6 h-6',
+                    'w-6 h-6 animate-icon-spin',
                     estadoGeneralConfig[analysisResult.estadoGeneral]?.colorClass || 'text-foreground'
                   )} />
                   <div>
@@ -281,16 +283,25 @@ const Analisis = () => {
                     return (
                       <div 
                         key={index}
-                        className="bg-card rounded-xl p-4 border border-border"
+                        className="bg-card rounded-xl p-4 border border-border opacity-0 animate-finding-enter"
+                        style={{ 
+                          animationDelay: `${index * 150}ms`,
+                          animationFillMode: 'forwards'
+                        }}
                       >
                         <div className="flex items-start gap-3">
-                          <div className={`w-4 h-4 rounded-full ${config.colorClass} shrink-0 mt-0.5`} />
+                          <div 
+                            className={`w-4 h-4 rounded-full ${config.colorClass} shrink-0 mt-0.5 animate-pulse-soft`}
+                            style={{ animationDelay: `${index * 150 + 300}ms` }}
+                          />
                           <div className="flex-1">
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                               <h3 className="font-semibold text-foreground">{config.label}</h3>
                               <div className="flex items-center gap-2 flex-wrap">
                                 {severidadCfg && (
-                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severidadCfg.colorClass}`}>
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severidadCfg.colorClass} animate-badge-pop`}
+                                    style={{ animationDelay: `${index * 150 + 200}ms` }}
+                                  >
                                     {severidadCfg.label}
                                   </span>
                                 )}
@@ -317,7 +328,9 @@ const Analisis = () => {
                               </p>
                             )}
                             {isPremiumUnlocked && hallazgo.recomendacionEspecifica && (
-                              <p className="text-xs text-primary mt-2 bg-primary/5 rounded-lg p-2">
+                              <p className="text-xs text-primary mt-2 bg-primary/5 rounded-lg p-2 animate-slide-up"
+                                style={{ animationDelay: `${index * 150 + 400}ms` }}
+                              >
                                 💡 {hallazgo.recomendacionEspecifica}
                               </p>
                             )}
