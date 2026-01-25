@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.flow-payment-confirm]
 verify_jwt = false
+
+[functions.smile-simulation]
+verify_jwt = false
