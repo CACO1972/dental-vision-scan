@@ -9,6 +9,7 @@ import SubirFoto from "./pages/SubirFoto";
 import IntroCaptura from "./pages/IntroCaptura";
 import AutoCapture from "./pages/AutoCapture";
 import RevisarFotos from "./pages/RevisarFotos";
+import AnalisisLoading from "./pages/AnalisisLoading";
 import Analisis from "./pages/Analisis";
 import Explicacion from "./pages/Explicacion";
 import NotFound from "./pages/NotFound";
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/intro-captura" element={<IntroCaptura />} />
             <Route path="/auto-capture" element={<AutoCapture />} />
             <Route path="/revisar-fotos" element={<RevisarFotos />} />
+            <Route path="/analizando" element={<AnalisisLoading />} />
             <Route path="/analisis" element={<Analisis />} />
             <Route path="/explicacion" element={<Explicacion />} />
             <Route path="*" element={<NotFound />} />

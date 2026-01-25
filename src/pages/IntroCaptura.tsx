@@ -5,35 +5,35 @@ import { Smile, ArrowUp, ArrowDown, Camera, ChevronRight, Volume2, VolumeX, User
 import { useImage, ViewType, CapturedImage } from '@/context/ImageContext';
 import { supabase } from '@/integrations/supabase/client';
 
-import dentalFrontalView from '@/assets/dental-frontal-view.png';
-import dentalSuperiorView from '@/assets/dental-superior-view.png';
-import dentalInferiorView from '@/assets/dental-inferior-view.png';
+import guideFrontal from '@/assets/guide-frontal.png';
+import guideSuperior from '@/assets/guide-superior.png';
+import guideInferior from '@/assets/guide-inferior.png';
 
 const views = [
   {
     id: 'frontal',
     icon: Smile,
     title: 'Vista Frontal',
-    description: 'Sonríe mostrando los dientes frontales, mirando de frente a la cámara.',
-    image: dentalFrontalView,
+    description: 'Usa separadores para mostrar los dientes. Sonríe de frente a la cámara.',
+    image: guideFrontal,
     voiceText: 'Para la primera foto, sonríe naturalmente mostrando tus dientes frontales. Mira directamente a la cámara. La captura será automática cuando detecte la posición correcta.',
   },
   {
     id: 'superior',
     icon: ArrowUp,
     title: 'Maxilar Superior',
-    description: 'Voltea el celular para que la cámara apunte desde abajo. Inclina la cabeza hacia atrás y abre la boca.',
-    image: dentalSuperiorView,
-    voiceText: 'Para la segunda foto del maxilar superior, voltea el celular de manera que la cámara quede mirando hacia arriba, desde abajo de tu mentón. Inclina tu cabeza hacia atrás y abre bien la boca. La cámara capturará automáticamente.',
+    description: 'Inclina la cabeza hacia atrás. La cámara apunta desde abajo hacia arriba.',
+    image: guideSuperior,
+    voiceText: 'Para la segunda foto del maxilar superior, voltea el celular de manera que la cámara quede mirando hacia arriba, desde abajo de tu mentón. Inclina tu cabeza hacia atrás y abre bien la boca.',
     tip: 'Voltea el celular para que la cámara apunte hacia arriba',
   },
   {
     id: 'inferior',
     icon: ArrowDown,
     title: 'Maxilar Inferior',
-    description: 'Mantén el celular arriba mirando hacia abajo. Abre la boca y baja la lengua.',
-    image: dentalInferiorView,
-    voiceText: 'Para la tercera foto del maxilar inferior, sostén el celular por encima de tu boca con la cámara apuntando hacia abajo. Abre la boca y baja la lengua para mostrar los dientes inferiores.',
+    description: 'Mira hacia abajo. La cámara apunta desde arriba hacia la boca abierta.',
+    image: guideInferior,
+    voiceText: 'Para la tercera foto del maxilar inferior, sostén el celular por encima de tu boca con la cámara apuntando hacia abajo. Abre la boca y baja la lengua.',
   },
 ];
 

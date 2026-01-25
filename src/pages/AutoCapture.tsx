@@ -6,9 +6,9 @@ import { ArrowLeft, Camera, Sun, SunDim, Check, Play, RotateCcw, ArrowRight, Cir
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 
-import dentalFrontalView from '@/assets/dental-frontal-view.png';
-import dentalSuperiorView from '@/assets/dental-superior-view.png';
-import dentalInferiorView from '@/assets/dental-inferior-view.png';
+import guideFrontal from '@/assets/guide-frontal.png';
+import guideSuperior from '@/assets/guide-superior.png';
+import guideInferior from '@/assets/guide-inferior.png';
 
 const VIEW_ORDER: ViewType[] = ['frontal', 'superior', 'inferior'];
 
@@ -31,9 +31,9 @@ const viewTips: Record<ViewType, string> = {
 };
 
 const viewImages: Record<ViewType, string> = {
-  frontal: dentalFrontalView,
-  superior: dentalSuperiorView,
-  inferior: dentalInferiorView,
+  frontal: guideFrontal,
+  superior: guideSuperior,
+  inferior: guideInferior,
 };
 
 const viewVoiceTexts: Record<ViewType, string> = {

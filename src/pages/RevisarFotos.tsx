@@ -1,11 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { useImage, ViewType } from '@/context/ImageContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Camera, Check, Loader2, RefreshCw, Scan } from 'lucide-react';
+import { ArrowLeft, Camera, Check, RefreshCw, Scan } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useEffect } from 'react';
 
 const viewLabels: Record<ViewType, string> = {
   frontal: 'Frontal',
@@ -17,8 +15,7 @@ const VIEW_ORDER: ViewType[] = ['frontal', 'superior', 'inferior'];
 
 const RevisarFotos = () => {
   const navigate = useNavigate();
-  const { capturedImages, clearCapturedImages, setAnalysisResult } = useImage();
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const { capturedImages, clearCapturedImages } = useImage();
 
   useEffect(() => {
     if (capturedImages.length === 0) {
@@ -33,105 +30,7 @@ const RevisarFotos = () => {
 
   const handleAnalyze = async () => {
     if (capturedImages.length === 0) return;
-
-    setIsAnalyzing(true);
-
-    try {
-      // Analyze all images and combine results
-      const allHallazgos: any[] = [];
-      let generalMessage = '';
-      let recommendation = '';
-      let worstImageQuality: 'buena' | 'aceptable' | 'mala' = 'buena';
-      let qualityNotes: string[] = [];
-      let estadoGeneral: 'bueno' | 'aceptable' | 'requiere_atencion' | 'urgente' = 'bueno';
-      let allProximosPasos: string[] = [];
-      let allAreasNoVisibles: string[] = [];
-
-      for (const image of capturedImages) {
-        const { data, error } = await supabase.functions.invoke('analyze-dental', {
-          body: { imageBase64: image.imageBase64 }
-        });
-
-        if (error) {
-          console.error('Analysis error for', image.view, ':', error);
-          continue;
-        }
-
-        if (data.error) {
-          console.error('API error for', image.view, ':', data.error);
-          continue;
-        }
-
-        // Add view information to each finding
-        if (data.hallazgos && Array.isArray(data.hallazgos)) {
-          const hallazgosConVista = data.hallazgos.map((h: any) => ({
-            ...h,
-            vista: image.view,
-          }));
-          allHallazgos.push(...hallazgosConVista);
-        }
-
-        // Collect messages
-        if (data.mensajeGeneral) {
-          generalMessage += `**Vista ${viewLabels[image.view]}:** ${data.mensajeGeneral}\n\n`;
-        }
-
-        if (data.recomendacion && !recommendation) {
-          recommendation = data.recomendacion;
-        }
-
-        // Track worst estado general
-        const estadoPriority = { bueno: 0, aceptable: 1, requiere_atencion: 2, urgente: 3 };
-        if (data.estadoGeneral && estadoPriority[data.estadoGeneral as keyof typeof estadoPriority] > estadoPriority[estadoGeneral]) {
-          estadoGeneral = data.estadoGeneral;
-        }
-
-        // Collect proximos pasos
-        if (data.proximosPasos && Array.isArray(data.proximosPasos)) {
-          allProximosPasos.push(...data.proximosPasos);
-        }
-
-        // Collect areas no visibles
-        if (data.areasNoVisibles && Array.isArray(data.areasNoVisibles)) {
-          allAreasNoVisibles.push(...data.areasNoVisibles);
-        }
-
-        // Track worst image quality
-        if (data.calidadImagen === 'mala') {
-          worstImageQuality = 'mala';
-        } else if (data.calidadImagen === 'aceptable' && worstImageQuality !== 'mala') {
-          worstImageQuality = 'aceptable';
-        }
-
-        if (data.notaCalidadImagen) {
-          qualityNotes.push(`${viewLabels[image.view]}: ${data.notaCalidadImagen}`);
-        }
-      }
-
-      // Remove duplicate proximos pasos and areas no visibles
-      const uniqueProximosPasos = [...new Set(allProximosPasos)];
-      const uniqueAreasNoVisibles = [...new Set(allAreasNoVisibles)];
-
-      const combinedResult = {
-        analisisValido: true,
-        mensajeGeneral: generalMessage.trim() || 'Análisis completado de las 3 vistas dentales.',
-        hallazgos: allHallazgos,
-        estadoGeneral,
-        recomendacion: recommendation || 'Se recomienda consultar con un profesional dental para una evaluación completa.',
-        proximosPasos: uniqueProximosPasos,
-        calidadImagen: worstImageQuality,
-        notaCalidadImagen: qualityNotes.join(' ') || '',
-        areasNoVisibles: uniqueAreasNoVisibles,
-      };
-
-      setAnalysisResult(combinedResult);
-      navigate('/analisis');
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error de conexión. Verifica tu internet e intenta de nuevo.');
-    } finally {
-      setIsAnalyzing(false);
-    }
+    navigate('/analizando');
   };
 
   const getCapturedImage = (view: ViewType) => {
@@ -220,37 +119,21 @@ const RevisarFotos = () => {
               size="xl" 
               className="w-full"
               onClick={handleAnalyze}
-              disabled={capturedImages.length === 0 || isAnalyzing}
+              disabled={capturedImages.length === 0}
             >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Analizando {capturedImages.length} fotos...
-                </>
-              ) : (
-                <>
-                  <Scan className="w-5 h-5 mr-2" />
-                  Analizar con IA
-                </>
-              )}
+              <Scan className="w-5 h-5 mr-2" />
+              Analizar con IA
             </Button>
 
             <Button
               variant="outline"
               className="w-full"
               onClick={handleRetake}
-              disabled={isAnalyzing}
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Volver a tomar fotos
             </Button>
           </div>
-
-          {isAnalyzing && (
-            <p className="text-center text-sm text-muted-foreground animate-pulse">
-              Analizando cada vista... Esto puede tomar unos segundos.
-            </p>
-          )}
         </div>
       </main>
     </div>
