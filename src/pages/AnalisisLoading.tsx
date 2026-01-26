@@ -18,6 +18,13 @@ const AnalisisLoading = () => {
   const hasMultipleImages = capturedImages.length > 0;
 
   useEffect(() => {
+    // Validate we have image data before proceeding
+    if (!hasMultipleImages && !selectedImageBase64) {
+      toast.error('No se encontró imagen para analizar');
+      navigate('/subir-foto');
+      return;
+    }
+
     const analyzeImages = async () => {
       try {
         if (hasMultipleImages) {
@@ -26,6 +33,11 @@ const AnalisisLoading = () => {
           let combinedResult: any = null;
 
           for (const img of capturedImages) {
+            if (!img.imageBase64) {
+              console.warn('Skipping image without base64:', img.view);
+              continue;
+            }
+            
             const { data, error } = await supabase.functions.invoke('analyze-dental', {
               body: { imageBase64: img.imageBase64 }
             });
@@ -74,7 +86,13 @@ const AnalisisLoading = () => {
             navigate('/revisar-fotos');
           }
         } else {
-          // Single image analysis
+          // Single image analysis - validate again
+          if (!selectedImageBase64) {
+            toast.error('No se encontró imagen para analizar');
+            navigate('/subir-foto');
+            return;
+          }
+          
           const { data, error } = await supabase.functions.invoke('analyze-dental', {
             body: { imageBase64: selectedImageBase64 }
           });
@@ -105,7 +123,7 @@ const AnalisisLoading = () => {
     };
 
     analyzeImages();
-  }, []);
+  }, [hasMultipleImages, selectedImageBase64, capturedImages, navigate, setAnalysisResult]);
 
   // Get display image
   const displayImage = hasMultipleImages 
