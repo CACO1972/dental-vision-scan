@@ -49,7 +49,7 @@ const VIEW_ORDER: ViewType[] = ['frontal', 'superior', 'inferior'];
 
 const IntroCaptura = () => {
   const navigate = useNavigate();
-  const { addCapturedImage, clearCapturedImages } = useImage();
+  const { addCapturedImage } = useImage();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeView, setActiveView] = useState<number | null>(null);
@@ -155,15 +155,19 @@ const IntroCaptura = () => {
     }
   };
 
+  const hasAnyUploads = uploadedViews.size > 0;
   const allUploaded = uploadedViews.size === 3;
 
   const handleContinueWithUploads = () => {
     navigate('/revisar-fotos');
   };
 
+  const handleAnalyzeDirect = () => {
+    navigate('/analizando');
+  };
+
   const handleStartCapture = () => {
-    clearCapturedImages();
-    setUploadedViews(new Set());
+    // Don't clear existing uploads - auto-capture will add/replace views
     navigate('/auto-capture');
   };
 
@@ -332,30 +336,31 @@ const IntroCaptura = () => {
 
         {/* Action buttons */}
         <div className="mt-4 space-y-3">
-          {allUploaded ? (
+          {hasAnyUploads && (
             <Button
-              onClick={handleContinueWithUploads}
+              onClick={allUploaded ? handleContinueWithUploads : handleAnalyzeDirect}
               size="lg"
               className="w-full h-14 text-lg font-semibold"
             >
-              Continuar con las imágenes
-              <ChevronRight className="ml-2 h-5 w-5" />
-            </Button>
-          ) : (
-            <Button
-              onClick={handleStartCapture}
-              size="lg"
-              className="w-full h-14 text-lg font-semibold"
-            >
-              <Camera className="mr-2 h-5 w-5" />
-              Captura automática
+              {allUploaded ? 'Revisar y analizar' : `Analizar ${uploadedViews.size} imagen${uploadedViews.size > 1 ? 'es' : ''}`}
               <ChevronRight className="ml-2 h-5 w-5" />
             </Button>
           )}
           
-          {uploadedViews.size > 0 && !allUploaded && (
+          <Button
+            onClick={handleStartCapture}
+            size="lg"
+            variant={hasAnyUploads ? "outline" : "default"}
+            className="w-full h-14 text-lg font-semibold"
+          >
+            <Camera className="mr-2 h-5 w-5" />
+            Captura automática
+            <ChevronRight className="ml-2 h-5 w-5" />
+          </Button>
+          
+          {hasAnyUploads && !allUploaded && (
             <p className="text-xs text-center text-muted-foreground">
-              {uploadedViews.size}/3 imágenes cargadas. Sube las 3 o usa captura automática.
+              {uploadedViews.size}/3 imágenes cargadas. Puedes analizar ahora o subir más.
             </p>
           )}
         </div>
