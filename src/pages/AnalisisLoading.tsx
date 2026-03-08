@@ -1,166 +1,118 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useImage } from '@/context/ImageContext';
+import { useImages } from '@/context/ImageContext';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import ScannerAnimation from '@/components/ScannerAnimation';
+
+const messages = [
+  'INICIANDO ESCANEO VISUAL...',
+  'MAPEANDO SUPERFICIES DENTALES...',
+  'ANALIZANDO TEJIDO GINGIVAL...',
+  'BUSCANDO SIGNOS DE CARIES...',
+  'EVALUANDO DEPÓSITOS Y SARRO...',
+  'VERIFICANDO ALINEACIÓN...',
+  'GENERANDO OBSERVACIONES...',
+];
 
 const AnalisisLoading = () => {
   const navigate = useNavigate();
-  const { 
-    selectedImageBase64, 
-    selectedImageUrl, 
-    capturedImages, 
-    setAnalysisResult 
-  } = useImage();
-  const [isAnalyzing, setIsAnalyzing] = useState(true);
-
-  const hasMultipleImages = capturedImages.length > 0;
+  const { images, setAnalysisResults } = useImages();
+  const [progress, setProgress] = useState(0);
+  const [msgIdx, setMsgIdx] = useState(0);
+  const hasStarted = useRef(false);
 
   useEffect(() => {
-    // Validate we have image data before proceeding
-    if (!hasMultipleImages && !selectedImageBase64) {
-      toast.error('No se encontró imagen para analizar');
-      navigate('/subir-foto');
-      return;
-    }
+    const timer = setInterval(() => {
+      setProgress(p => Math.min(p + 0.8, 95));
+    }, 100);
+    const msgTimer = setInterval(() => {
+      setMsgIdx(i => (i + 1) % messages.length);
+    }, 2200);
+    return () => { clearInterval(timer); clearInterval(msgTimer); };
+  }, []);
 
-    const analyzeImages = async () => {
+  useEffect(() => {
+    if (hasStarted.current) return;
+    hasStarted.current = true;
+
+    const analyze = async () => {
       try {
-        if (hasMultipleImages) {
-          // Multi-view analysis
-          const allHallazgos: any[] = [];
-          let combinedResult: any = null;
-
-          for (const img of capturedImages) {
-            if (!img.imageBase64) {
-              console.warn('Skipping image without base64:', img.view);
-              continue;
-            }
-            
-            const { data, error } = await supabase.functions.invoke('analyze-dental', {
-              body: { imageBase64: img.imageBase64 }
-            });
-
-            if (error) {
-              console.error('Analysis error for view', img.view, error);
-              continue;
-            }
-
-            if (data.hallazgos) {
-              const hallazgosWithView = data.hallazgos.map((h: any) => ({
-                ...h,
-                vista: img.view
-              }));
-              allHallazgos.push(...hallazgosWithView);
-            }
-
-            if (!combinedResult) {
-              combinedResult = { ...data };
-            } else {
-              // Merge results
-              if (data.estadoGeneral === 'urgente' || 
-                  (data.estadoGeneral === 'requiere_atencion' && combinedResult.estadoGeneral !== 'urgente')) {
-                combinedResult.estadoGeneral = data.estadoGeneral;
-              }
-              if (data.proximosPasos) {
-                combinedResult.proximosPasos = [
-                  ...new Set([...combinedResult.proximosPasos, ...data.proximosPasos])
-                ];
-              }
-              if (data.areasNoVisibles) {
-                combinedResult.areasNoVisibles = [
-                  ...new Set([...combinedResult.areasNoVisibles, ...data.areasNoVisibles])
-                ];
-              }
-            }
-          }
-
-          if (combinedResult) {
-            combinedResult.hallazgos = allHallazgos;
-            combinedResult.mensajeGeneral = `Análisis completado de ${capturedImages.length} vistas dentales. ${combinedResult.mensajeGeneral || ''}`;
-            setAnalysisResult(combinedResult);
-            navigate('/analisis');
-          } else {
-            toast.error('No se pudo completar el análisis');
-            navigate('/revisar-fotos');
-          }
-        } else {
-          // Single image analysis - validate again
-          if (!selectedImageBase64) {
-            toast.error('No se encontró imagen para analizar');
-            navigate('/subir-foto');
-            return;
-          }
-          
-          const { data, error } = await supabase.functions.invoke('analyze-dental', {
-            body: { imageBase64: selectedImageBase64 }
-          });
-
-          if (error) {
-            console.error('Analysis error:', error);
-            toast.error('Error al analizar la imagen. Intenta de nuevo.');
-            navigate('/subir-foto');
-            return;
-          }
-
-          if (data.error) {
-            toast.error(data.error);
-            navigate('/subir-foto');
-            return;
-          }
-
-          setAnalysisResult(data);
-          navigate('/analisis');
+        const imageEntries = Object.entries(images || {});
+        if (imageEntries.length === 0) {
+          navigate('/intro-captura');
+          return;
         }
-      } catch (error) {
-        console.error('Error:', error);
-        toast.error('Error de conexión. Verifica tu internet e intenta de nuevo.');
-        navigate('/subir-foto');
-      } finally {
-        setIsAnalyzing(false);
+        const results: any[] = [];
+        for (const [view, data] of imageEntries) {
+          if (!(data as any)?.imageBase64) continue;
+          const { data: result, error } = await supabase.functions.invoke('analyze-dental', {
+            body: { imageBase64: (data as any).imageBase64 }
+          });
+          if (!error && result?.hallazgos) {
+            results.push({ view, ...result });
+          }
+        }
+        if (results.length > 0) {
+          setAnalysisResults(results);
+          setProgress(100);
+          setTimeout(() => navigate('/analisis'), 600);
+        } else {
+          const firstImg = (imageEntries[0]?.[1] as any)?.imageBase64;
+          if (firstImg) {
+            const { data: result, error } = await supabase.functions.invoke('analyze-dental', {
+              body: { imageBase64: firstImg }
+            });
+            if (!error && result) {
+              setAnalysisResults([{ view: 'frontal', ...result }]);
+              setProgress(100);
+              setTimeout(() => navigate('/analisis'), 600);
+              return;
+            }
+          }
+          navigate('/intro-captura');
+        }
+      } catch (err) {
+        console.error('Analysis error:', err);
+        navigate('/intro-captura');
       }
     };
-
-    analyzeImages();
-  }, [hasMultipleImages, selectedImageBase64, capturedImages, navigate, setAnalysisResult]);
-
-  // Get display image
-  const displayImage = hasMultipleImages 
-    ? capturedImages[0]?.imageUrl 
-    : selectedImageUrl;
-
-  if (!displayImage) {
-    navigate('/subir-foto');
-    return null;
-  }
+    analyze();
+  }, []);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 py-12">
-      <div className="w-full max-w-lg space-y-8 animate-fade-in">
-        {/* Title */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl md:text-4xl font-display font-semibold text-foreground">
-            Analizando
-          </h1>
-          <p className="text-muted-foreground">
-            {hasMultipleImages 
-              ? `Procesando ${capturedImages.length} imágenes dentales` 
-              : 'Procesando tu imagen dental'}
+    <div className="min-h-screen bg-[#0A0A0A] noise-overlay flex flex-col items-center justify-center px-5">
+      <div className="max-w-sm w-full text-center space-y-8 relative z-10">
+        {/* Hexagon scanner icon */}
+        <div className="relative w-24 h-24 mx-auto">
+          <div className="absolute inset-0 border-[3px] border-[#C9A86C] rotate-45 animate-pulse-gold"></div>
+          <div className="absolute inset-3 border-[2px] border-[#C9A86C]/50 rotate-45"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="font-display text-3xl text-[#C9A86C]">{Math.round(progress)}%</span>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h2 className="font-mono text-[11px] font-bold text-[#C9A86C] uppercase tracking-[0.3em] animate-blink">
+            {messages[msgIdx]}
+          </h2>
+          
+          {/* Progress bar */}
+          <div className="w-full h-[3px] bg-white/10">
+            <div className="h-full bg-[#C9A86C] transition-all duration-200 ease-out" style={{ width: `${progress}%` }}></div>
+          </div>
+          
+          <p className="font-mono text-[9px] text-white/30 tracking-wide">
+            PROCESANDO DATOS BIOMÉTRICOS: {Math.round(progress)}%
           </p>
         </div>
 
-        {/* Scanner Animation */}
-        <ScannerAnimation 
-          isScanning={isAnalyzing}
-          imageUrl={displayImage}
-          estimatedDuration={hasMultipleImages ? 25 : 12}
-        />
-
-        {/* Info text */}
-        <p className="text-center text-sm text-muted-foreground">
-          Nuestra IA está examinando cada detalle de tus dientes...
-        </p>
+        {/* Fake data stream */}
+        <div className="font-mono text-[8px] text-[#C9A86C]/30 space-y-1 text-left overflow-hidden max-h-20">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} style={{ opacity: 0.3 + (i * 0.1) }}>
+              {`0x${Math.random().toString(16).substr(2, 8).toUpperCase()} → SCAN_LAYER_${i + 1}`}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
