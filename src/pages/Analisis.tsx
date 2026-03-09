@@ -1,497 +1,307 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { useImage, Hallazgo, ViewType } from '@/context/ImageContext';
-import { Scan, ArrowLeft, AlertCircle, CheckCircle2, AlertTriangle, ImageOff, Activity, ListChecks, EyeOff, Lock, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ArrowLeft, AlertCircle, CheckCircle2, AlertTriangle, ImageOff, Activity, ListChecks, EyeOff, Lock, Sparkles, Scan } from 'lucide-react';
 import PaymentUpgrade from '@/components/PaymentUpgrade';
 import SmileSimulation from '@/components/SmileSimulation';
 import { useToast } from '@/hooks/use-toast';
-const tipoConfig: Record<string, { color: string; colorClass: string; label: string }> = {
-  caries: { color: '#ef4444', colorClass: 'bg-destructive', label: 'Posible caries' },
-  calculo: { color: '#22c55e', colorClass: 'bg-success', label: 'Posible cálculo/sarro' },
-  desgaste: { color: '#f59e0b', colorClass: 'bg-warning', label: 'Desgaste dental' },
-  gingivitis: { color: '#8b5cf6', colorClass: 'bg-purple-500', label: 'Posible gingivitis' },
-  placa: { color: '#eab308', colorClass: 'bg-yellow-500', label: 'Placa dental' },
-  restauracion: { color: '#3b82f6', colorClass: 'bg-blue-500', label: 'Restauración' },
-  fractura: { color: '#dc2626', colorClass: 'bg-red-600', label: 'Fractura' },
-  manchas: { color: '#a16207', colorClass: 'bg-amber-700', label: 'Manchas' },
-  recesion: { color: '#7c3aed', colorClass: 'bg-violet-600', label: 'Recesión gingival' },
-  otro: { color: '#6b7280', colorClass: 'bg-gray-500', label: 'Observación' },
+
+const T = {
+  base:'#080808',surface:'#0E0C1A',surface2:'#1A1826',
+  border:'rgba(255,255,255,0.08)',primary:'#FFFFFF',
+  accent:'#9D95FF',accentSoft:'#C4BFFF',muted:'rgba(255,255,255,0.38)',
+  green:'#0AE448',red:'#E63946',orange:'#FF8709',yellow:'#FFE500',
 };
 
-const confianzaLabel: Record<string, string> = {
-  alta: 'Alta confianza',
-  media: 'Confianza media',
-  baja: 'Baja confianza',
+const tipoConfig: Record<string,{color:string;label:string}> = {
+  caries:       {color:'#E63946',label:'Posible caries'},
+  calculo:      {color:'#0AE448',label:'Posible cálculo/sarro'},
+  desgaste:     {color:'#FF8709',label:'Desgaste dental'},
+  gingivitis:   {color:'#9D95FF',label:'Posible gingivitis'},
+  placa:        {color:'#FFE500',label:'Placa dental'},
+  restauracion: {color:'#3b82f6',label:'Restauración'},
+  fractura:     {color:'#dc2626',label:'Fractura'},
+  manchas:      {color:'#a16207',label:'Manchas'},
+  recesion:     {color:'#7c3aed',label:'Recesión gingival'},
+  otro:         {color:'#6b7280',label:'Observación'},
 };
 
-const severidadConfig: Record<string, { colorClass: string; label: string }> = {
-  leve: { colorClass: 'bg-success/20 text-success', label: 'Leve' },
-  moderado: { colorClass: 'bg-warning/20 text-warning', label: 'Moderado' },
-  severo: { colorClass: 'bg-destructive/20 text-destructive', label: 'Severo' },
+const confianzaLabel: Record<string,string> = {alta:'Alta confianza',media:'Confianza media',baja:'Baja confianza'};
+const severidadLabel: Record<string,{color:string;label:string}> = {
+  leve:     {color:'#0AE448',label:'Leve'},
+  moderado: {color:'#FF8709',label:'Moderado'},
+  severo:   {color:'#E63946',label:'Severo'},
 };
+const estadoConfig: Record<string,{color:string;label:string}> = {
+  bueno:             {color:'#0AE448',label:'Estado general bueno'},
+  aceptable:         {color:'#9D95FF',label:'Estado general aceptable'},
+  requiere_atencion: {color:'#FF8709',label:'Requiere atención'},
+  urgente:           {color:'#E63946',label:'Atención urgente recomendada'},
+};
+const viewLabels: Record<ViewType,string> = {frontal:'Frontal',superior:'Superior',inferior:'Inferior'};
 
-const estadoGeneralConfig: Record<string, { icon: string; colorClass: string; bgClass: string; label: string }> = {
-  bueno: { icon: '✓', colorClass: 'text-success', bgClass: 'bg-success/10 border-success/20', label: 'Estado general bueno' },
-  aceptable: { icon: '○', colorClass: 'text-primary', bgClass: 'bg-primary/10 border-primary/20', label: 'Estado general aceptable' },
-  requiere_atencion: { icon: '!', colorClass: 'text-warning', bgClass: 'bg-warning/10 border-warning/20', label: 'Requiere atención' },
-  urgente: { icon: '⚠', colorClass: 'text-destructive', bgClass: 'bg-destructive/10 border-destructive/20', label: 'Atención urgente recomendada' },
-};
-
-const viewLabels: Record<ViewType, string> = {
-  frontal: 'Frontal',
-  superior: 'Superior',
-  inferior: 'Inferior',
-};
+const Tag = ({label,color}:{label:string,color:string}) => (
+  <span style={{fontFamily:'Space Mono',fontSize:7,letterSpacing:'0.1em',textTransform:'uppercase',padding:'2px 8px',border:`1px solid ${color}40`,color,background:`${color}10`}}>{label}</span>
+);
 
 const Analisis = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { toast } = useToast();
-  const { selectedImageUrl, selectedImageBase64, analysisResult, capturedImages } = useImage();
-  const [selectedView, setSelectedView] = useState<ViewType | 'all'>('all');
+  const {toast} = useToast();
+  const {selectedImageUrl,selectedImageBase64,analysisResult,capturedImages} = useImage();
+  const [selectedView, setSelectedView] = useState<ViewType|'all'>('all');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isPremiumUnlocked, setIsPremiumUnlocked] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // Check for successful payment return
-  useEffect(() => {
+  useEffect(()=>{ setTimeout(()=>setMounted(true),100); },[]);
+
+  useEffect(()=>{
     const paymentStatus = searchParams.get('payment');
-    if (paymentStatus === 'success') {
-      const pendingPayment = localStorage.getItem('pendingPayment');
-      if (pendingPayment) {
-        setIsPremiumUnlocked(true);
-        localStorage.removeItem('pendingPayment');
-        toast({
-          title: '¡Pago exitoso!',
-          description: 'Tu informe completo ya está disponible.',
-        });
-      }
+    if(paymentStatus==='success'){
+      const pending = localStorage.getItem('pendingPayment');
+      if(pending){ setIsPremiumUnlocked(true); localStorage.removeItem('pendingPayment'); toast({title:'¡Pago exitoso!',description:'Tu informe completo ya está disponible.'}); }
     }
-  }, [searchParams, toast]);
+  },[searchParams,toast]);
 
-  useEffect(() => {
-    // Check if we have either single image or multiple captured images
-    const hasSingleImage = selectedImageUrl && analysisResult;
-    const hasMultipleImages = capturedImages.length > 0 && analysisResult;
-    
-    if (!hasSingleImage && !hasMultipleImages) {
-      navigate('/subir-foto');
-    }
-  }, [selectedImageUrl, analysisResult, capturedImages, navigate]);
+  useEffect(()=>{
+    const hasSingle = selectedImageUrl&&analysisResult;
+    const hasMulti = capturedImages.length>0&&analysisResult;
+    if(!hasSingle&&!hasMulti) navigate('/subir-foto');
+  },[selectedImageUrl,analysisResult,capturedImages,navigate]);
 
-  if (!analysisResult) return null;
+  if(!analysisResult) return null;
 
   const hasMultipleImages = capturedImages.length > 0;
-  const hasFindings = analysisResult.hallazgos && analysisResult.hallazgos.length > 0;
-
-  // Filter findings by view
-  const filteredFindings = selectedView === 'all' 
-    ? analysisResult.hallazgos 
-    : analysisResult.hallazgos.filter((h: Hallazgo) => h.vista === selectedView);
-
-  // Get current display image
-  const getCurrentImage = () => {
-    if (hasMultipleImages) {
-      if (selectedView === 'all') {
-        return capturedImages[0]?.imageUrl;
-      }
-      return capturedImages.find(img => img.view === selectedView)?.imageUrl;
-    }
+  const hasFindings = analysisResult.hallazgos?.length > 0;
+  const filteredFindings = selectedView==='all'?analysisResult.hallazgos:analysisResult.hallazgos.filter((h:Hallazgo)=>h.vista===selectedView);
+  const getCurrentImage = ()=>{
+    if(hasMultipleImages) return selectedView==='all'?capturedImages[0]?.imageUrl:capturedImages.find(i=>i.view===selectedView)?.imageUrl;
     return selectedImageUrl;
   };
+  const estadoCfg = estadoConfig[analysisResult.estadoGeneral];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div style={{minHeight:'100vh',background:T.base,color:T.primary,display:'flex',flexDirection:'column'}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap');*{box-sizing:border-box;margin:0;padding:0}@keyframes slideIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}@keyframes pulseD{0%,100%{opacity:1}50%{opacity:.5}}`}</style>
+
       {/* Header */}
-      <header className="w-full py-4 px-6 border-b border-border bg-card">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <button 
-            onClick={() => navigate(hasMultipleImages ? '/revisar-fotos' : '/subir-foto')}
-            className="w-10 h-10 rounded-lg hover:bg-secondary flex items-center justify-center transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-          </button>
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <Scan className="w-5 h-5 text-primary-foreground" />
+      <header style={{padding:'14px 20px',borderBottom:`1px solid ${T.border}`,background:T.surface,display:'flex',alignItems:'center',gap:12,position:'sticky',top:0,zIndex:20}}>
+        <button onClick={()=>navigate(hasMultipleImages?'/revisar-fotos':'/subir-foto')} style={{width:36,height:36,background:'none',border:`1px solid ${T.border}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'rgba(255,255,255,0.4)'}}>
+          <ArrowLeft size={16}/>
+        </button>
+        <div style={{width:36,height:36,background:T.accent,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <Scan size={16} color={T.base}/>
+        </div>
+        <div>
+          <div style={{fontFamily:'Anton',fontSize:15,letterSpacing:'0.04em',color:T.primary}}>RESULTADOS</div>
+          <div style={{fontFamily:'Space Mono',fontSize:7,color:T.accent,letterSpacing:'0.2em',textTransform:'uppercase'}}>
+            {analysisResult.analisisValido?'Análisis completado':'No se pudo analizar'}
           </div>
-          <span className="font-semibold text-lg text-foreground">Resultados del análisis</span>
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 px-6 py-8">
-        <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-          {/* Title */}
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-              {analysisResult.analisisValido 
-                ? 'Análisis completado' 
-                : 'No se pudo analizar la imagen'}
-            </h1>
-            {hasMultipleImages && (
-              <p className="text-sm text-primary font-medium">
-                {capturedImages.length} vistas analizadas
-              </p>
-            )}
+      <main style={{flex:1,padding:'20px',maxWidth:600,margin:'0 auto',width:'100%'}}>
+
+        {/* Image quality warning */}
+        {analysisResult.calidadImagen&&analysisResult.calidadImagen!=='buena'&&(
+          <div style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',background:`${analysisResult.calidadImagen==='mala'?T.red:T.orange}10`,border:`1px solid ${analysisResult.calidadImagen==='mala'?T.red:T.orange}30`,marginBottom:16}}>
+            <ImageOff size={16} color={analysisResult.calidadImagen==='mala'?T.red:T.orange} style={{flexShrink:0}}/>
+            <div>
+              <div style={{fontFamily:'Anton',fontSize:12,letterSpacing:'0.04em',color:analysisResult.calidadImagen==='mala'?T.red:T.orange,marginBottom:3}}>CALIDAD: {analysisResult.calidadImagen?.toUpperCase()}</div>
+              <p style={{fontFamily:'DM Sans',fontSize:12,color:T.muted,lineHeight:1.6}}>{analysisResult.notaCalidadImagen}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Estado general */}
+        {estadoCfg&&(
+          <div style={{display:'flex',alignItems:'center',gap:12,padding:'14px 16px',background:`${estadoCfg.color}0A`,border:`2px solid ${estadoCfg.color}40`,marginBottom:16,animation:mounted?'slideIn 0.4s ease':'none'}}>
+            <Activity size={20} color={estadoCfg.color} style={{animation:'pulseD 2s infinite'}}/>
+            <div>
+              <div style={{fontFamily:'Anton',fontSize:15,letterSpacing:'0.04em',color:estadoCfg.color}}>{estadoCfg.label.toUpperCase()}</div>
+            </div>
+          </div>
+        )}
+
+        {/* View selector */}
+        {hasMultipleImages&&(
+          <div style={{display:'flex',gap:2,marginBottom:16,flexWrap:'wrap'}}>
+            {[{v:'all',label:`TODAS (${analysisResult.hallazgos.length})`},...capturedImages.map(img=>({v:img.view,label:`${viewLabels[img.view].toUpperCase()} (${analysisResult.hallazgos.filter((h:Hallazgo)=>h.vista===img.view).length})`}))].map(({v,label})=>(
+              <button key={v} onClick={()=>setSelectedView(v as any)} style={{padding:'7px 14px',background:selectedView===v?T.accent:'transparent',color:selectedView===v?T.base:'rgba(255,255,255,0.4)',fontFamily:'Space Mono',fontSize:7,letterSpacing:'0.15em',border:`1px solid ${selectedView===v?T.accent:T.border}`,cursor:'pointer',textTransform:'uppercase',transition:'all 0.15s'}}>{label}</button>
+            ))}
+          </div>
+        )}
+
+        {/* Image */}
+        <div style={{marginBottom:16}}>
+          {hasMultipleImages?(
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4,marginBottom:12}}>
+              {capturedImages.map(img=>(
+                <button key={img.view} onClick={()=>setSelectedView(img.view)} style={{aspectRatio:'1',overflow:'hidden',border:`2px solid ${selectedView===img.view||selectedView==='all'?T.accent:T.border}`,cursor:'pointer',background:'none',padding:0,transition:'border-color 0.2s'}}>
+                  <img src={img.imageUrl} alt={viewLabels[img.view]} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                </button>
+              ))}
+            </div>
+          ):(
+            <div style={{border:`1px solid ${T.border}`,overflow:'hidden',marginBottom:12}}>
+              <img src={selectedImageUrl||''} alt="Imagen dental" style={{width:'100%',height:'auto',maxHeight:280,objectFit:'contain',display:'block',background:T.surface}}/>
+            </div>
+          )}
+
+          {/* General message */}
+          <div style={{padding:'12px 14px',background:T.surface,border:`1px solid ${T.border}`}}>
+            <p style={{fontFamily:'DM Sans',fontSize:13,color:T.muted,lineHeight:1.7}}>{analysisResult.mensajeGeneral}</p>
+          </div>
+        </div>
+
+        {/* Hallazgos */}
+        <div style={{marginBottom:16}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+            {filteredFindings.length>0
+              ?<><AlertCircle size={16} color={T.accent}/><span style={{fontFamily:'Anton',fontSize:14,letterSpacing:'0.04em',color:T.primary}}>OBSERVACIONES ({filteredFindings.length})</span></>
+              :<><CheckCircle2 size={16} color={T.green}/><span style={{fontFamily:'Anton',fontSize:14,letterSpacing:'0.04em',color:T.green}}>SIN HALLAZGOS EVIDENTES</span></>
+            }
           </div>
 
-          {/* Image quality warning */}
-          {analysisResult.calidadImagen !== 'buena' && (
-            <div className={`rounded-xl p-4 flex items-start gap-3 ${
-              analysisResult.calidadImagen === 'mala' 
-                ? 'bg-destructive/10 border border-destructive/20' 
-                : 'bg-warning/10 border border-warning/20'
-            }`}>
-              <ImageOff className={`w-5 h-5 shrink-0 mt-0.5 ${
-                analysisResult.calidadImagen === 'mala' ? 'text-destructive' : 'text-warning'
-              }`} />
-              <div>
-                <h3 className={`font-semibold text-sm ${
-                  analysisResult.calidadImagen === 'mala' ? 'text-destructive' : 'text-warning'
-                }`}>
-                  Calidad de imagen: {analysisResult.calidadImagen}
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {analysisResult.notaCalidadImagen}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* View selector for multiple images */}
-          {hasMultipleImages && (
-            <div className="flex gap-2 flex-wrap justify-center">
-              <button
-                onClick={() => setSelectedView('all')}
-                className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                  selectedView === 'all'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
-                )}
-              >
-                Todos ({analysisResult.hallazgos.length})
-              </button>
-              {capturedImages.map(img => {
-                const viewFindings = analysisResult.hallazgos.filter((h: Hallazgo) => h.vista === img.view);
+          {filteredFindings.length>0?(
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {filteredFindings.slice(0,isPremiumUnlocked?undefined:2).map((h:Hallazgo,i:number)=>{
+                const cfg=tipoConfig[h.tipo]||tipoConfig.otro;
+                const sevCfg=h.severidad?severidadLabel[h.severidad]:null;
                 return (
-                  <button
-                    key={img.view}
-                    onClick={() => setSelectedView(img.view)}
-                    className={cn(
-                      'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                      selectedView === img.view
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    {viewLabels[img.view]} ({viewFindings.length})
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Image display */}
-            <div className="space-y-4">
-              {hasMultipleImages ? (
-                <div className="grid grid-cols-3 gap-2">
-                  {capturedImages.map(img => (
-                    <button
-                      key={img.view}
-                      onClick={() => setSelectedView(img.view)}
-                      className={cn(
-                        'aspect-square rounded-xl overflow-hidden border-2 transition-all',
-                        selectedView === img.view || selectedView === 'all'
-                          ? 'border-primary ring-2 ring-primary/30'
-                          : 'border-border opacity-60 hover:opacity-100'
-                      )}
-                    >
-                      <img
-                        src={img.imageUrl}
-                        alt={`Vista ${viewLabels[img.view]}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-card rounded-2xl border border-border overflow-hidden">
-                  <img
-                    src={selectedImageUrl || ''}
-                    alt="Imagen dental"
-                    className="w-full h-auto max-h-96 object-contain"
-                  />
-                </div>
-              )}
-
-              {/* General message */}
-              <div className="bg-card rounded-xl p-4 border border-border">
-                <p className="text-sm text-muted-foreground whitespace-pre-line">
-                  {analysisResult.mensajeGeneral}
-                </p>
-              </div>
-            </div>
-
-            {/* Detections and info list */}
-            <div className="space-y-4">
-              {/* Estado General */}
-              {analysisResult.estadoGeneral && (
-                <div className={cn(
-                  'rounded-xl p-4 border flex items-center gap-3 opacity-0 animate-status-reveal',
-                  estadoGeneralConfig[analysisResult.estadoGeneral]?.bgClass || 'bg-muted'
-                )}
-                style={{ animationFillMode: 'forwards' }}
-                >
-                  <Activity className={cn(
-                    'w-6 h-6 animate-icon-spin',
-                    estadoGeneralConfig[analysisResult.estadoGeneral]?.colorClass || 'text-foreground'
-                  )} />
-                  <div>
-                    <h3 className={cn(
-                      'font-semibold',
-                      estadoGeneralConfig[analysisResult.estadoGeneral]?.colorClass || 'text-foreground'
-                    )}>
-                      {estadoGeneralConfig[analysisResult.estadoGeneral]?.label || 'Estado general'}
-                    </h3>
-                  </div>
-                </div>
-              )}
-
-              {/* Hallazgos */}
-              <h2 className="font-semibold text-foreground flex items-center gap-2">
-                {filteredFindings.length > 0 ? (
-                  <>
-                    <AlertCircle className="w-5 h-5 text-primary" />
-                    Hallazgos detectados ({filteredFindings.length})
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 text-success" />
-                    Sin hallazgos evidentes
-                  </>
-                )}
-              </h2>
-              
-              {filteredFindings.length > 0 ? (
-                <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                  {filteredFindings.slice(0, isPremiumUnlocked ? undefined : 2).map((hallazgo: Hallazgo, index: number) => {
-                    const config = tipoConfig[hallazgo.tipo] || tipoConfig.otro;
-                    const severidadCfg = hallazgo.severidad ? severidadConfig[hallazgo.severidad] : null;
-                    return (
-                      <div 
-                        key={index}
-                        className="bg-card rounded-xl p-4 border border-border opacity-0 animate-finding-enter"
-                        style={{ 
-                          animationDelay: `${index * 150}ms`,
-                          animationFillMode: 'forwards'
-                        }}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div 
-                            className={`w-4 h-4 rounded-full ${config.colorClass} shrink-0 mt-0.5 animate-pulse-soft`}
-                            style={{ animationDelay: `${index * 150 + 300}ms` }}
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <h3 className="font-semibold text-foreground">{config.label}</h3>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {severidadCfg && (
-                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${severidadCfg.colorClass} animate-badge-pop`}
-                                    style={{ animationDelay: `${index * 150 + 200}ms` }}
-                                  >
-                                    {severidadCfg.label}
-                                  </span>
-                                )}
-                                {hallazgo.vista && (
-                                  <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                                    {viewLabels[hallazgo.vista]}
-                                  </span>
-                                )}
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                  hallazgo.confianza === 'alta' 
-                                    ? 'bg-success/20 text-success' 
-                                    : hallazgo.confianza === 'media'
-                                      ? 'bg-warning/20 text-warning'
-                                      : 'bg-muted text-muted-foreground'
-                                }`}>
-                                  {confianzaLabel[hallazgo.confianza]}
-                                </span>
-                              </div>
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-1">{hallazgo.descripcion}</p>
-                            {hallazgo.ubicacion && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                📍 {hallazgo.ubicacion}
-                              </p>
-                            )}
-                            {isPremiumUnlocked && hallazgo.recomendacionEspecifica && (
-                              <p className="text-xs text-primary mt-2 bg-primary/5 rounded-lg p-2 animate-slide-up"
-                                style={{ animationDelay: `${index * 150 + 400}ms` }}
-                              >
-                                💡 {hallazgo.recomendacionEspecifica}
-                              </p>
-                            )}
+                  <div key={i} style={{padding:'14px',background:T.surface,border:`1px solid ${T.border}`,borderLeft:`3px solid ${cfg.color}`,animation:mounted?`slideIn 0.4s ${i*0.1}s both ease`:'none'}}>
+                    <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
+                      <div style={{width:10,height:10,borderRadius:'50%',background:cfg.color,flexShrink:0,marginTop:3,boxShadow:`0 0 6px ${cfg.color}`,animation:'pulseD 2s infinite'}}/>
+                      <div style={{flex:1}}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6,flexWrap:'wrap',gap:6}}>
+                          <span style={{fontFamily:'Anton',fontSize:14,letterSpacing:'0.03em',color:T.primary}}>{cfg.label.toUpperCase()}</span>
+                          <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                            {sevCfg&&<Tag label={sevCfg.label} color={sevCfg.color}/>}
+                            {h.vista&&<Tag label={viewLabels[h.vista]} color={T.accent}/>}
+                            {h.confianza&&<Tag label={confianzaLabel[h.confianza]} color={h.confianza==='alta'?T.green:h.confianza==='media'?T.orange:'rgba(255,255,255,0.3)'}/>}
                           </div>
                         </div>
+                        <p style={{fontFamily:'DM Sans',fontSize:12,color:T.muted,lineHeight:1.6,marginBottom:h.ubicacion?4:0}}>{h.descripcion}</p>
+                        {h.ubicacion&&<p style={{fontFamily:'Space Mono',fontSize:8,color:'rgba(255,255,255,0.25)',letterSpacing:'0.1em'}}>📍 {h.ubicacion}</p>}
+                        {isPremiumUnlocked&&h.recomendacionEspecifica&&(
+                          <div style={{marginTop:8,padding:'8px 10px',background:`${T.accent}10`,border:`1px solid ${T.accent}30`}}>
+                            <p style={{fontFamily:'DM Sans',fontSize:11,color:T.accent,lineHeight:1.6}}>💡 {h.recomendacionEspecifica}</p>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                  
-                  {/* Premium locked content indicator */}
-                  {!isPremiumUnlocked && filteredFindings.length > 2 && (
-                    <div 
-                      className="bg-gradient-to-b from-card to-muted/50 rounded-xl p-6 border border-border text-center cursor-pointer hover:border-primary/50 transition-colors"
-                      onClick={() => setShowPaymentModal(true)}
-                    >
-                      <Lock className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-                      <h3 className="font-semibold text-foreground mb-1">
-                        +{filteredFindings.length - 2} hallazgos más
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Desbloquea el informe completo para ver todos los hallazgos y recomendaciones personalizadas
-                      </p>
-                      <Button variant="hero" size="sm" onClick={() => setShowPaymentModal(true)}>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Desbloquear por $4.990
-                      </Button>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-success/10 rounded-xl p-4 border border-success/20">
-                  <p className="text-sm text-foreground">
-                    No se detectaron problemas evidentes en {selectedView === 'all' ? 'las imágenes' : 'esta vista'}. 
-                    Sin embargo, esto <strong>no garantiza</strong> que no existan problemas dentales. 
-                    Una evaluación profesional presencial es necesaria para un diagnóstico completo.
-                  </p>
-                </div>
-              )}
+                  </div>
+                );
+              })}
 
-              {/* Próximos Pasos */}
-              {analysisResult.proximosPasos && analysisResult.proximosPasos.length > 0 && (
-                <div className="bg-card rounded-xl p-4 border border-border">
-                  <h3 className="font-semibold text-sm text-foreground mb-3 flex items-center gap-2">
-                    <ListChecks className="w-4 h-4 text-primary" />
-                    Próximos pasos recomendados
-                  </h3>
-                  <ol className="space-y-2">
-                    {analysisResult.proximosPasos.map((paso, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
-                        <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center shrink-0 mt-0.5 font-medium">
-                          {index + 1}
-                        </span>
-                        {paso}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
+              {/* Lock gate */}
+              {!isPremiumUnlocked&&filteredFindings.length>2&&(
+                <button onClick={()=>setShowPaymentModal(true)} style={{padding:'24px 16px',background:T.surface,border:`2px dashed ${T.accent}40`,cursor:'pointer',textAlign:'center',width:'100%',transition:'border-color 0.2s'}}
+                  onMouseEnter={e=>(e.currentTarget.style.borderColor=`${T.accent}80`)}
+                  onMouseLeave={e=>(e.currentTarget.style.borderColor=`${T.accent}40`)}>
+                  <Lock size={24} color='rgba(255,255,255,0.2)' style={{margin:'0 auto 10px'}}/>
+                  <div style={{fontFamily:'Anton',fontSize:16,letterSpacing:'0.04em',color:T.primary,marginBottom:4}}>+{filteredFindings.length-2} OBSERVACIONES MÁS</div>
+                  <p style={{fontFamily:'DM Sans',fontSize:12,color:T.muted,marginBottom:14,lineHeight:1.6}}>Desbloquea el informe completo con todas las observaciones y recomendaciones personalizadas</p>
+                  <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'10px 20px',background:T.accent,color:T.base,fontFamily:'Anton',fontSize:13,letterSpacing:'0.06em',textTransform:'uppercase'}}>
+                    <Sparkles size={14}/> DESBLOQUEAR POR $4.990
+                  </div>
+                </button>
               )}
-
-              {/* Áreas no visibles */}
-              {analysisResult.areasNoVisibles && analysisResult.areasNoVisibles.length > 0 && (
-                <div className="bg-muted/50 rounded-xl p-4 border border-border">
-                  <h3 className="font-semibold text-sm text-muted-foreground mb-2 flex items-center gap-2">
-                    <EyeOff className="w-4 h-4" />
-                    Áreas no evaluadas
-                  </h3>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    {analysisResult.areasNoVisibles.map((area, index) => (
-                      <li key={index} className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
-                        {area}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Recommendation */}
-              {analysisResult.recomendacion && (
-                <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
-                  <h3 className="font-semibold text-sm text-primary mb-2">💡 Recomendación general</h3>
-                  <p className="text-sm text-foreground">{analysisResult.recomendacion}</p>
-                </div>
-              )}
-
-              {/* Disclaimer */}
-              <div className="bg-accent/50 rounded-xl p-4 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-                <p className="text-sm text-accent-foreground">
-                  <strong>Importante:</strong> Este análisis es orientativo y fue realizado por inteligencia artificial. 
-                  NO reemplaza la evaluación de un profesional odontólogo. 
-                  Consulta con tu dentista para un diagnóstico definitivo.
-                </p>
-              </div>
             </div>
-          </div>
-
-          {/* Smile Simulation - Premium Feature */}
-          {isPremiumUnlocked && hasFindings && (
-            <SmileSimulation 
-              imageBase64={capturedImages[0]?.imageBase64 || selectedImageBase64 || ''} 
-              hallazgos={analysisResult.hallazgos}
-            />
-          )}
-
-          {!isPremiumUnlocked && hasFindings && (
-            <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 rounded-2xl p-6 border border-primary/20">
-              <div className="flex flex-col md:flex-row items-center gap-4">
-                <div className="flex-1 text-center md:text-left">
-                  <h3 className="font-bold text-lg text-foreground mb-1">
-                    ¿Quieres el informe completo?
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Incluye todos los hallazgos, recomendaciones personalizadas y simulación de sonrisa
-                  </p>
-                </div>
-                <Button 
-                  variant="hero" 
-                  size="lg"
-                  onClick={() => setShowPaymentModal(true)}
-                >
-                  <Sparkles className="w-5 h-5 mr-2" />
-                  Desbloquear por $4.990
-                </Button>
-              </div>
+          ):(
+            <div style={{padding:'16px',background:`${T.green}0A`,border:`1px solid ${T.green}30`}}>
+              <p style={{fontFamily:'DM Sans',fontSize:13,color:T.muted,lineHeight:1.7}}>No se detectaron problemas evidentes. Sin embargo, esto <strong style={{color:T.primary}}>no garantiza</strong> ausencia de patologías. Una evaluación presencial es necesaria para un examen completo.</p>
             </div>
           )}
+        </div>
 
-          {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
-            {isPremiumUnlocked && hasFindings && (
-              <Button 
-                variant="hero" 
-                size="lg"
-                onClick={() => navigate('/explicacion')}
-              >
-                Ver explicación detallada
-              </Button>
-            )}
-            <Button 
-              variant="outline" 
-              size="lg"
-              onClick={() => navigate('/subir-foto')}
-            >
-              Analizar otras fotos
-            </Button>
+        {/* Próximos pasos */}
+        {analysisResult.proximosPasos?.length>0&&(
+          <div style={{marginBottom:16,padding:'14px',background:T.surface,border:`1px solid ${T.border}`}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+              <ListChecks size={14} color={T.accent}/>
+              <span style={{fontFamily:'Anton',fontSize:12,letterSpacing:'0.04em',color:T.primary}}>PRÓXIMOS PASOS</span>
+            </div>
+            <ol style={{listStyle:'none'}}>
+              {analysisResult.proximosPasos.map((paso:string,i:number)=>(
+                <li key={i} style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:8}}>
+                  <div style={{width:20,height:20,border:`1px solid ${T.accent}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <span style={{fontFamily:'Anton',fontSize:10,color:T.accent}}>{i+1}</span>
+                  </div>
+                  <p style={{fontFamily:'DM Sans',fontSize:12,color:T.muted,lineHeight:1.6,marginTop:2}}>{paso}</p>
+                </li>
+              ))}
+            </ol>
           </div>
+        )}
+
+        {/* Áreas no visibles */}
+        {analysisResult.areasNoVisibles?.length>0&&(
+          <div style={{marginBottom:16,padding:'12px 14px',background:'rgba(255,255,255,0.02)',border:`1px solid ${T.border}`}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+              <EyeOff size={12} color='rgba(255,255,255,0.25)'/>
+              <span style={{fontFamily:'Space Mono',fontSize:8,color:'rgba(255,255,255,0.25)',letterSpacing:'0.15em',textTransform:'uppercase'}}>ÁREAS NO EVALUADAS</span>
+            </div>
+            {analysisResult.areasNoVisibles.map((area:string,i:number)=>(
+              <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                <div style={{width:3,height:3,background:'rgba(255,255,255,0.2)',borderRadius:'50%',flexShrink:0}}/>
+                <span style={{fontFamily:'DM Sans',fontSize:11,color:'rgba(255,255,255,0.3)'}}>{area}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Recomendación */}
+        {analysisResult.recomendacion&&(
+          <div style={{marginBottom:16,padding:'14px',background:`${T.accent}08`,border:`1px solid ${T.accent}25`}}>
+            <div style={{fontFamily:'Anton',fontSize:11,letterSpacing:'0.06em',color:T.accent,marginBottom:6}}>💡 RECOMENDACIÓN</div>
+            <p style={{fontFamily:'DM Sans',fontSize:13,color:T.muted,lineHeight:1.7}}>{analysisResult.recomendacion}</p>
+          </div>
+        )}
+
+        {/* Premium upsell */}
+        {!isPremiumUnlocked&&hasFindings&&(
+          <div style={{marginBottom:16,padding:'20px',background:T.surface,border:`1px solid ${T.border}`,display:'flex',flexDirection:'column',gap:12,alignItems:'center',textAlign:'center'}}>
+            <div style={{fontFamily:'Anton',fontSize:18,letterSpacing:'0.02em',color:T.primary}}>¿QUIERES EL INFORME COMPLETO?</div>
+            <p style={{fontFamily:'DM Sans',fontSize:13,color:T.muted,lineHeight:1.6,maxWidth:320}}>Incluye todas las observaciones, recomendaciones personalizadas y simulación de sonrisa</p>
+            <button onClick={()=>setShowPaymentModal(true)} style={{padding:'14px 28px',background:T.accent,color:T.base,fontFamily:'Anton',fontSize:14,letterSpacing:'0.06em',textTransform:'uppercase',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
+              <Sparkles size={16}/> DESBLOQUEAR POR $4.990
+            </button>
+          </div>
+        )}
+
+        {/* Premium content */}
+        {isPremiumUnlocked&&hasFindings&&(
+          <SmileSimulation imageBase64={capturedImages[0]?.imageBase64||selectedImageBase64||''} hallazgos={analysisResult.hallazgos}/>
+        )}
+
+        {/* Disclaimer */}
+        <div style={{padding:'12px 14px',background:`${T.orange}08`,border:`1px solid ${T.orange}20`,marginBottom:16,display:'flex',alignItems:'flex-start',gap:10}}>
+          <AlertTriangle size={14} color={T.orange} style={{flexShrink:0,marginTop:2}}/>
+          <p style={{fontFamily:'DM Sans',fontSize:11,color:'rgba(255,255,255,0.45)',lineHeight:1.7}}>
+            <strong style={{color:'rgba(255,255,255,0.6)'}}>Orientativo:</strong> Este análisis es generado por inteligencia artificial. NO reemplaza la evaluación de un profesional odontólogo habilitado. Consulta con tu dentista para un examen definitivo.
+          </p>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {isPremiumUnlocked&&hasFindings&&(
+            <button onClick={()=>navigate('/explicacion')} style={{width:'100%',padding:'16px 0',background:T.accent,color:T.base,fontFamily:'Anton',fontSize:15,letterSpacing:'0.06em',textTransform:'uppercase',border:'none',cursor:'pointer'}}>
+              VER EXPLICACIÓN DETALLADA
+            </button>
+          )}
+          <button onClick={()=>navigate('/subir-foto')} style={{width:'100%',padding:'14px 0',background:'transparent',color:'rgba(255,255,255,0.4)',fontFamily:'Anton',fontSize:13,letterSpacing:'0.06em',textTransform:'uppercase',border:`1px solid ${T.border}`,cursor:'pointer'}}>
+            ANALIZAR OTRAS FOTOS
+          </button>
         </div>
       </main>
 
       {/* Payment Modal */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full animate-fade-in">
-            <PaymentUpgrade 
-              onClose={() => setShowPaymentModal(false)}
-              onSuccess={() => {
-                setIsPremiumUnlocked(true);
-                setShowPaymentModal(false);
-              }}
-            />
+      {showPaymentModal&&(
+        <div style={{position:'fixed',inset:0,zIndex:50,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div style={{maxWidth:420,width:'100%'}}>
+            <PaymentUpgrade onClose={()=>setShowPaymentModal(false)} onSuccess={()=>{setIsPremiumUnlocked(true);setShowPaymentModal(false);}}/>
           </div>
         </div>
       )}
