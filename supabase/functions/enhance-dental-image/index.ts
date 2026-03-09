@@ -21,9 +21,9 @@ serve(async (req) => {
       );
     }
 
-    const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY') || Deno.env.get('GEMINI_API_KEY');
-    if (!GOOGLE_API_KEY) {
-      console.error('GOOGLE_API_KEY is not configured');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      console.error('LOVABLE_API_KEY is not configured');
       return new Response(
         JSON.stringify({ error: 'Servicio de IA no configurado', originalImage: imageBase64 }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -48,23 +48,34 @@ serve(async (req) => {
 - Si la imagen está muy oscura o borrosa, aclárala y enfócala
 La imagen resultante debe ser útil para un análisis dental profesional.`;
 
-    const base64Data = imageBase64.startsWith('data:') 
-      ? imageBase64.replace(/^data:image\/\w+;base64,/, '')
-      : imageBase64;
+    const imageUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GOOGLE_API_KEY}`, {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: enhancementPrompt },
-            { inlineData: { mimeType: 'image/jpeg', data: base64Data } }
-          ]
-        }],
-        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: enhancementPrompt
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: imageUrl
+                }
+              }
+            ]
+          }
+        ],
+        modalities: ['image', 'text']
       }),
     });
 
@@ -106,14 +117,7 @@ La imagen resultante debe ser útil para un análisis dental profesional.`;
     }
 
     const data = await response.json();
-    let enhancedImageUrl = null;
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    for (const part of parts) {
-      if (part.inlineData?.data) {
-        enhancedImageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-        break;
-      }
-    }
+    const enhancedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!enhancedImageUrl) {
       console.log('No enhanced image returned, using original');
