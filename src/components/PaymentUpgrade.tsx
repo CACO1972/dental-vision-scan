@@ -29,7 +29,7 @@ const PaymentUpgrade = ({ email: initialEmail, onSuccess, onClose }: PaymentUpgr
     setIsLoading(true);
     try {
       const orderId = `dental_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const amount = selectedPlan === 'premium' ? 10990 : 4990;
+      const amount = selectedPlan === 'premium' ? 14990 : 6990;
       const subject = selectedPlan === 'premium' 
         ? 'Análisis Dental + Telemedicina con Especialista' 
         : 'Análisis Dental Completo + Simulación de Sonrisa';
@@ -43,7 +43,7 @@ const PaymentUpgrade = ({ email: initialEmail, onSuccess, onClose }: PaymentUpgr
           commerceOrder: orderId,
           subject,
           urlReturn: returnUrl,
-          urlConfirmation: `https://tqidweeyjqimxljutgut.supabase.co/functions/v1/flow-payment-confirm`,
+          urlConfirmation: `https://jipldlklzobiytkvxokf.supabase.co/functions/v1/flow-payment-confirm`,
         },
       });
 
@@ -111,7 +111,7 @@ const PaymentUpgrade = ({ email: initialEmail, onSuccess, onClose }: PaymentUpgr
               <p className="text-xs text-muted-foreground mt-0.5">Informe + Simulación de sonrisa</p>
             </div>
             <div className="text-right">
-              <p className="text-lg font-bold text-foreground">$4.990</p>
+              <p className="text-lg font-bold text-foreground">$6.990</p>
               <p className="text-xs text-muted-foreground line-through">$25.000</p>
             </div>
           </div>
@@ -142,7 +142,7 @@ const PaymentUpgrade = ({ email: initialEmail, onSuccess, onClose }: PaymentUpgr
               <p className="text-xs text-muted-foreground mt-0.5">Todo + Videollamada con dentista</p>
             </div>
             <div className="text-right">
-              <p className="text-lg font-bold text-foreground">$10.990</p>
+              <p className="text-lg font-bold text-foreground">$14.990</p>
               <p className="text-xs text-muted-foreground line-through">$65.000</p>
             </div>
           </div>
@@ -202,7 +202,7 @@ const PaymentUpgrade = ({ email: initialEmail, onSuccess, onClose }: PaymentUpgr
         ) : (
           <>
             <Lock className="w-5 h-5 mr-2" />
-            Pagar ${selectedPlan === 'premium' ? '10.990' : '4.990'}
+            Pagar ${selectedPlan === 'premium' ? '14.990' : '6.990'}
           </>
         )}
       </Button>

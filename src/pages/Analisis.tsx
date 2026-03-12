@@ -204,7 +204,7 @@ const Analisis = () => {
                   <div style={{fontFamily:'Anton',fontSize:16,letterSpacing:'0.04em',color:T.primary,marginBottom:4}}>+{filteredFindings.length-2} OBSERVACIONES MÁS</div>
                   <p style={{fontFamily:'DM Sans',fontSize:12,color:T.muted,marginBottom:14,lineHeight:1.6}}>Desbloquea el informe completo con todas las observaciones y recomendaciones personalizadas</p>
                   <div style={{display:'inline-flex',alignItems:'center',gap:8,padding:'10px 20px',background:T.accent,color:T.base,fontFamily:'Anton',fontSize:13,letterSpacing:'0.06em',textTransform:'uppercase'}}>
-                    <Sparkles size={14}/> DESBLOQUEAR POR $4.990
+                    <Sparkles size={14}/> DESBLOQUEAR POR $6.990
                   </div>
                 </button>
               )}
@@ -266,7 +266,7 @@ const Analisis = () => {
             <div style={{fontFamily:'Anton',fontSize:18,letterSpacing:'0.02em',color:T.primary}}>¿QUIERES EL INFORME COMPLETO?</div>
             <p style={{fontFamily:'DM Sans',fontSize:13,color:T.muted,lineHeight:1.6,maxWidth:320}}>Incluye todas las observaciones, recomendaciones personalizadas y simulación de sonrisa</p>
             <button onClick={()=>setShowPaymentModal(true)} style={{padding:'14px 28px',background:T.accent,color:T.base,fontFamily:'Anton',fontSize:14,letterSpacing:'0.06em',textTransform:'uppercase',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
-              <Sparkles size={16}/> DESBLOQUEAR POR $4.990
+              <Sparkles size={16}/> DESBLOQUEAR POR $6.990
             </button>
           </div>
         )}
