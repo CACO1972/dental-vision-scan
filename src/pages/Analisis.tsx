@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useImage, Hallazgo, ViewType } from '@/context/ImageContext';
-import { ArrowLeft, AlertCircle, CheckCircle2, AlertTriangle, ImageOff, Activity, ListChecks, EyeOff, Lock, Sparkles, Scan } from 'lucide-react';
+import { ArrowLeft, AlertCircle, CheckCircle2, AlertTriangle, ImageOff, Activity, ListChecks, EyeOff, Lock, Sparkles, Scan, Loader2 } from 'lucide-react';
 import PaymentUpgrade from '@/components/PaymentUpgrade';
 import SmileSimulation from '@/components/SmileSimulation';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const T = {
   base:'#080808',surface:'#0E0C1A',surface2:'#1A1826',
@@ -52,17 +53,70 @@ const Analisis = () => {
   const [selectedView, setSelectedView] = useState<ViewType|'all'>('all');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isPremiumUnlocked, setIsPremiumUnlocked] = useState(false);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(()=>{ setTimeout(()=>setMounted(true),100); },[]);
 
+  // Server-side payment verification — no localStorage bypass possible
+  const verifyPaymentServerSide = useCallback(async (commerceOrder: string) => {
+    setIsVerifyingPayment(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { commerceOrder },
+      });
+
+      if (error) throw error;
+
+      if (data?.verified === true) {
+        setIsPremiumUnlocked(true);
+        toast({
+          title: '¡Pago verificado!',
+          description: 'Tu informe completo está disponible.',
+        });
+        // Clean up URL params without triggering re-verification
+        window.history.replaceState({}, '', '/analisis');
+      } else {
+        toast({
+          title: 'Pago pendiente',
+          description: 'No encontramos tu pago. Si ya pagaste, espera unos segundos e intenta de nuevo.',
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      console.error('Payment verification error:', err);
+      toast({
+        title: 'Error al verificar pago',
+        description: 'No se pudo verificar tu pago. Contacta a soporte si ya realizaste el pago.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVerifyingPayment(false);
+    }
+  }, [toast]);
+
   useEffect(()=>{
     const paymentStatus = searchParams.get('payment');
-    if(paymentStatus==='success'){
-      const pending = localStorage.getItem('pendingPayment');
-      if(pending){ setIsPremiumUnlocked(true); localStorage.removeItem('pendingPayment'); toast({title:'¡Pago exitoso!',description:'Tu informe completo ya está disponible.'}); }
+    const commerceOrder = searchParams.get('order') || searchParams.get('commerceOrder');
+
+    if (paymentStatus === 'success' && commerceOrder) {
+      verifyPaymentServerSide(commerceOrder);
+    } else if (paymentStatus === 'success' && !commerceOrder) {
+      // Fallback: try to get order from localStorage (only to read the order ID, not to grant access)
+      const pendingStr = localStorage.getItem('pendingPayment');
+      if (pendingStr) {
+        try {
+          const pending = JSON.parse(pendingStr);
+          if (pending?.orderId) {
+            verifyPaymentServerSide(pending.orderId);
+            localStorage.removeItem('pendingPayment');
+          }
+        } catch (_) {
+          localStorage.removeItem('pendingPayment');
+        }
+      }
     }
-  },[searchParams,toast]);
+  },[searchParams, verifyPaymentServerSide]);
 
   useEffect(()=>{
     const hasSingle = selectedImageUrl&&analysisResult;
@@ -100,6 +154,15 @@ const Analisis = () => {
           </div>
         </div>
       </header>
+
+      {/* Payment verification banner */}
+      {isVerifyingPayment && (
+        <div style={{padding:'12px 20px',background:`${T.accent}15`,borderBottom:`1px solid ${T.accent}30`,display:'flex',alignItems:'center',gap:10}}>
+          <Loader2 size={14} color={T.accent} style={{animation:'spin 1s linear infinite'}} />
+          <span style={{fontFamily:'DM Sans',fontSize:13,color:T.accent}}>Verificando tu pago de forma segura...</span>
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        </div>
+      )}
 
       <main style={{flex:1,padding:'20px',maxWidth:600,margin:'0 auto',width:'100%'}}>
 

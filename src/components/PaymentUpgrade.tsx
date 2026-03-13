@@ -33,7 +33,7 @@ const PaymentUpgrade = ({ email: initialEmail, onSuccess, onClose }: PaymentUpgr
       const subject = selectedPlan === 'premium' 
         ? 'Análisis Dental + Telemedicina con Especialista' 
         : 'Análisis Dental Completo + Simulación de Sonrisa';
-      const returnUrl = `${window.location.origin}/analisis?payment=success&plan=${selectedPlan}`;
+      const returnUrl = `${window.location.origin}/analisis?payment=success&plan=${selectedPlan}&order=${encodeURIComponent(orderId)}`;
 
       const { data, error } = await supabase.functions.invoke('flow-payment', {
         body: {

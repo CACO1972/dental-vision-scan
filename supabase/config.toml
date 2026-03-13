@@ -1,4 +1,4 @@
-project_id = "tqidweeyjqimxljutgut"
+project_id = "jipldlklzobiytkvxokf"
 
 [functions.analyze-dental]
 verify_jwt = false
@@ -16,4 +16,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.smile-simulation]
+verify_jwt = false
+
+[functions.verify-payment]
 verify_jwt = false

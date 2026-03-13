@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#080808"/>
+  <!-- Grid lines -->
+  <line x1="0" y1="315" x2="1200" y2="315" stroke="#ffffff" stroke-opacity="0.04" stroke-width="1"/>
+  <line x1="600" y1="0" x2="600" y2="630" stroke="#ffffff" stroke-opacity="0.04" stroke-width="1"/>
+  <!-- Radar circles -->
+  <circle cx="600" cy="315" r="280" fill="none" stroke="#9D95FF" stroke-opacity="0.08" stroke-width="1"/>
+  <circle cx="600" cy="315" r="200" fill="none" stroke="#9D95FF" stroke-opacity="0.08" stroke-width="1"/>
+  <circle cx="600" cy="315" r="120" fill="none" stroke="#9D95FF" stroke-opacity="0.08" stroke-width="1"/>
+  <!-- Accent bar -->
+  <rect x="0" y="0" width="6" height="630" fill="#9D95FF"/>
+  <!-- SCANDENT wordmark -->
+  <text x="100" y="250" font-family="Arial Black, sans-serif" font-size="96" font-weight="900" fill="#FFFFFF" letter-spacing="-2">SCANDENT</text>
+  <!-- Tagline -->
+  <text x="100" y="310" font-family="Arial, sans-serif" font-size="28" fill="#9D95FF" letter-spacing="8">ANÁLISIS DENTAL CON IA</text>
+  <!-- Divider -->
+  <rect x="100" y="340" width="480" height="2" fill="#9D95FF" opacity="0.4"/>
+  <!-- Sub text -->
+  <text x="100" y="390" font-family="Arial, sans-serif" font-size="22" fill="rgba(255,255,255,0.5)">7 de cada 10 chilenos tienen problemas dentales</text>
+  <text x="100" y="425" font-family="Arial, sans-serif" font-size="22" fill="rgba(255,255,255,0.5)">que no detectan. ¿Y tú?</text>
+  <!-- Badge -->
+  <rect x="100" y="480" width="220" height="44" rx="22" fill="#9D95FF"/>
+  <text x="210" y="508" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#080808" text-anchor="middle">HUMANA.AI</text>
+  <!-- Scan icon simplified -->
+  <rect x="980" y="180" width="140" height="140" rx="12" fill="none" stroke="#9D95FF" stroke-width="2" opacity="0.6"/>
+  <rect x="1010" y="210" width="80" height="80" rx="6" fill="none" stroke="#9D95FF" stroke-width="1.5" opacity="0.4"/>
+  <rect x="1030" y="230" width="40" height="40" rx="4" fill="#9D95FF" opacity="0.3"/>
+  <!-- Scan lines -->
+  <line x1="980" y1="250" x2="1120" y2="250" stroke="#9D95FF" stroke-width="2" opacity="0.8" stroke-dasharray="4 4"/>
+</svg>
