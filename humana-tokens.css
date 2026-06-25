@@ -1,0 +1,188 @@
+/* ════════════════════════════════════════════════════════════════════════════
+ * humana-tokens.css · Sistema de Diseño Clínica Miró + HUMANA.AI
+ * ════════════════════════════════════════════════════════════════════════════
+ * Versión: 1.0 · Junio 2026
+ * Documentación: ./BRAND_GUIDELINES.md
+ * Mantenedor: Dr. Carlos Montoya
+ *
+ * REGLA DE ORO: nunca hardcodear hex codes. Siempre usar var(--token).
+ * Si necesitas un valor que no está acá, documéntalo en BRAND_GUIDELINES.md
+ * primero y luego agrégalo a este archivo.
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ──────────────────────────────────────────────────────────────────────────
+   * COLOR · PALETA PRIMARIA (uso libre, brand-safe)
+   * ────────────────────────────────────────────────────────────────────────── */
+
+  /** Negro casi puro — headlines y texto principal sobre fondo claro */
+  --ink-darkest: #090B0B;
+
+  /** Carbón profundo — body text sobre fondo claro */
+  --ink-dark: #1C2121;
+
+  /** Blanco — fondo primario */
+  --paper: #FFFFFF;
+
+  /** Gris perla — fondo alternativo (cards, secciones) */
+  --paper-alt: #F5F5F5;
+
+  /** Bronce dorado — único acento de marca. NUNCA en bloques de texto. */
+  --bronze: #D3A436;
+
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * COLOR · NEGROS EXPRESIVOS (hero / dark sections)
+   * ────────────────────────────────────────────────────────────────────────── */
+
+  --ink-true: #000000;        /* Solo body bg del landing */
+  --ink-warmer-1: #020201;    /* Centro radial gradient */
+  --ink-warmer-2: #0A0805;    /* Anillos exteriores gradient */
+  --ink-warmer-3: #0A0D0D;    /* Cards sobre dark */
+  --ink-warmer-4: #101414;    /* Inputs sobre dark */
+  --bronze-shadow: #1A1208;   /* Shadow del logo en canvas */
+  --bronze-deep: #3A2810;     /* Core cálido bajo el logo */
+
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * COLOR · TEXTO SOBRE FONDO OSCURO ("ash" — nunca blanco puro)
+   * ────────────────────────────────────────────────────────────────────────── */
+
+  --ash-100: #E8E6E0;   /* Headlines sobre dark */
+  --ash-200: #D9D6CE;   /* Subhead sobre dark */
+  --ash-300: #C9C6BE;   /* Body sobre dark */
+  --ash-400: #9A9790;   /* Captions / metadata */
+  --ash-500: #6A6F6F;   /* Disabled / hint / separadores */
+
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * COLOR · BRONCE — VARIANTES (sombras / glows)
+   * ────────────────────────────────────────────────────────────────────────── */
+
+  --bronze-dark: #B5891C;     /* Hover de outlines, bordes secundarios */
+  --bronze-bright: #E8C065;   /* Highlight del logo (glow superior) */
+
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * COLOR · FUNCIONALES (estados clínicos, alertas)
+   * ────────────────────────────────────────────────────────────────────────── */
+
+  --ok: #00E5A0;       /* Confianza alta, hallazgos OK */
+  --warn: #FFA500;     /* Confianza media, "a evaluar" */
+  --alert: #FF6B35;    /* Hallazgos críticos (uso muy restringido) */
+
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * COLOR · BRAND EXTERNOS (no son nuestros — marcas terceras)
+   * ────────────────────────────────────────────────────────────────────────── */
+
+  --whatsapp: #25D366;
+
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * TIPOGRAFÍA
+   * ────────────────────────────────────────────────────────────────────────── */
+
+  --font-display: 'Montserrat', 'Arial Black', sans-serif;
+  --font-body: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Menlo', 'Courier New', monospace;
+
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * SPACING (base 4px)
+   * ────────────────────────────────────────────────────────────────────────── */
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+  --s-9: 96px;
+  --s-10: 128px;
+
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * BORDER RADIUS
+   * ────────────────────────────────────────────────────────────────────────── */
+
+  --r-sm: 2px;       /* Badges, tags */
+  --r-md: 3px;       /* Buttons, inputs */
+  --r-lg: 8px;       /* Cards */
+  --r-xl: 16px;      /* Modales, hero containers */
+  --r-full: 9999px;  /* Avatares, pills */
+
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * MOTION
+   * ────────────────────────────────────────────────────────────────────────── */
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 150ms;
+  --dur-base: 300ms;
+  --dur-slow: 600ms;
+
+
+  /* ──────────────────────────────────────────────────────────────────────────
+   * CONTAINER
+   * ────────────────────────────────────────────────────────────────────────── */
+
+  --container-max: 1180px;
+  --container-pad: clamp(20px, 5vw, 48px);
+}
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * UTILIDADES BASE
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* Reset mínimo */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-dark);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings → Montserrat 900 UPPERCASE por defecto */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--ink-darkest);
+  margin: 0 0 var(--s-4);
+}
+
+/* Texto generoso por defecto */
+p { margin: 0 0 var(--s-4); }
+
+/* Container */
+.container {
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--container-pad);
+}
+
+
+/* Respetar preferencia de movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
